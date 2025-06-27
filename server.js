@@ -1,132 +1,80 @@
+// server.js
 const express = require('express');
 const http = require('http');
-const { Server } = require('socket.io');
+const socketIo = require('socket.io');
 const path = require('path');
+const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = socketIo(server);
 
-// Serve static files
+let onlineUsers = new Map();
+
+// Serve static files and uploaded images
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Store messages and users
-let messages = [];
-let users = [];
+// Configure Multer for image uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + '-' + file.originalname);
+  }
+});
+const upload = multer({ storage: storage });
 
-io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
-  
-  let currentUser = null;
-  
-  // User connection
-  socket.on('user connected', (user) => {
-    currentUser = {
-      id: socket.id,
-      name: user.name,
-      online: true
-    };
-    
-    // Add to users list
-    users.push(currentUser);
-    
-    // Send online count
-    io.emit('online count', users.length);
-    
-    // Notify other users
-    socket.broadcast.emit('user connected', { 
-      user: currentUser, 
-      users: users 
-    });
-    
-    // Send stored messages to the new user
-    socket.emit('load messages', messages);
-  });
-  
-  // Chat message
-  socket.on('chat message', (msg) => {
-    messages.push(msg);
-    
-    // Keep only last 100 messages
-    if (messages.length > 100) {
-      messages.shift();
-    }
-    
-    io.emit('chat message', msg);
-  });
-  
-  // Typing indicator
-  socket.on('typing', (username) => {
-    socket.broadcast.emit('typing', username);
-  });
-  
-  // Stop typing
-  socket.on('stop typing', () => {
-    socket.broadcast.emit('stop typing');
-  });
-  
-  // Add reaction
-  socket.on('add reaction', ({ messageId, reaction }) => {
-    const msg = messages.find(m => m.id === messageId);
-    if (msg) {
-      if (!msg.reactions) msg.reactions = {};
-      msg.reactions[reaction] = (msg.reactions[reaction] || 0) + 1;
-      io.emit('add reaction', { messageId, reaction });
-    }
-  });
-  
-  // Edit message
-  socket.on('edit message', ({ messageId, newText }) => {
-    const msg = messages.find(m => m.id === messageId);
-    if (msg && msg.name === currentUser.name) {
-      msg.text = newText;
-      msg.edited = true;
-      io.emit('message edited', { messageId, newText });
-    }
-  });
-  
-  // Handle username change
-  socket.on('user name change', (newName) => {
-    if (currentUser) {
-      const oldName = currentUser.name;
-      currentUser.name = newName;
-      
-      // Update all messages with the old name
-      messages.forEach(msg => {
-        if (msg.name === oldName) {
-          msg.name = newName;
-        }
-      });
-      
-      // Notify clients
-      io.emit('user name changed', { oldName, newName });
-    }
+// Image upload endpoint
+app.post('/upload', upload.single('image'), (req, res) => {
+  if (req.file) {
+    res.json({ imageUrl: `/uploads/${req.file.filename}` });
+  } else {
+    res.status(400).json({ error: 'No image uploaded' });
+  }
+});
+
+// Socket.IO event handlers
+io.on('connection', socket => {
+  let userName = '';
+
+  const broadcastUsers = () => {
+    const users = Array.from(onlineUsers.values());
+    io.emit('online users', { count: users.length, users });
+  };
+
+  socket.on('user joined', name => {
+    userName = name;
+    onlineUsers.set(socket.id, name);
+    io.emit('user joined', name);
+    broadcastUsers();
   });
 
-  // Disconnect
+  socket.on('chat message', data => {
+    io.emit('chat message', data);
+  });
+
+  socket.on('chat image', data => {
+    io.emit('chat image', data);
+  });
+
+  socket.on('typing', name => {
+    socket.broadcast.emit('typing', name);
+  });
+
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-    
-    if (currentUser) {
-      // Update user status
-      const userIndex = users.findIndex(u => u.id === socket.id);
-      if (userIndex !== -1) {
-        users.splice(userIndex, 1);
-      }
-      
-      // Update online count
-      io.emit('online count', users.length);
-      
-      // Notify other users
-      io.emit('user disconnected', { 
-        user: currentUser, 
-        users: users 
-      });
+    if (userName) {
+      onlineUsers.delete(socket.id);
+      io.emit('user left', userName);
+      broadcastUsers();
     }
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+server.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));

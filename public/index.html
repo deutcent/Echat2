@@ -1,1529 +1,261 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Super Chat Pro</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WhatsApp Clone</title>
   <style>
-    :root {
-      --primary: #4361ee;
-      --primary-dark: #3a56d4;
-      --secondary: #f72585;
-      --light: #f8f9fa;
-      --dark: #212529;
-      --success: #4cc9f0;
-      --danger: #f94144;
-      --warning: #f8961e;
-      --info: #4895ef;
-      --gray: #adb5bd;
-      --light-gray: #e9ecef;
-      --card-bg: rgba(255, 255, 255, 0.92);
-      --shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
-      --message-self: #e3f2fd;
-      --message-other: #f8f9fa;
-      --background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      --sidebar-width: 280px;
-      --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    }
-
-    .dark-mode {
-      --primary: #6c8bff;
-      --primary-dark: #5a7df4;
-      --light: #1e1f26;
-      --dark: #f0f0f0;
-      --card-bg: rgba(30, 31, 38, 0.92);
-      --message-self: #2a4365;
-      --message-other: #2d3748;
-      --light-gray: #252732;
-      --background: linear-gradient(135deg, #2c3e50 0%, #1a1a2e 100%);
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      -webkit-tap-highlight-color: transparent;
-    }
-
     body {
-      background: var(--background);
-      min-height: 100vh;
+      font-family: sans-serif;
+      background: #ece5dd;
+      margin: 0;
       display: flex;
       justify-content: center;
       align-items: center;
-      transition: var(--transition);
-      padding: 5px;
+      height: 100vh;
     }
 
-    .chat-container {
+    #chat-container {
       width: 100%;
+      max-width: 500px;
       height: 100vh;
+      background: #fff;
       display: flex;
       flex-direction: column;
-      background: var(--card-bg);
-      overflow: hidden;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(12px);
-      position: relative;
-      transition: var(--transition);
     }
 
-    .chat-header {
-      background: var(--primary);
+    header {
+      background: #075e54;
       color: white;
-      padding: 10px 15px;
+      padding: 10px;
+      font-weight: bold;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-      z-index: 10;
     }
 
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex: 1;
-      min-width: 0;
+    #user-list {
+      padding: 5px 10px;
+      background: #f4f4f4;
+      font-size: 0.9em;
+      color: #333;
     }
 
-    .logo {
-      font-size: 24px;
-      animation: pulse 2s infinite;
-    }
-
-    .app-title {
-      font-size: 1.1rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .online-indicator {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 14px;
-      margin-left: 5px;
-    }
-
-    .indicator {
-      width: 8px;
-      height: 8px;
-      background-color: #2ecc71;
-      border-radius: 50%;
-      animation: blink 1.5s infinite;
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 8px;
-    }
-
-    .header-btn {
-      background: rgba(255, 255, 255, 0.2);
-      border: none;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      cursor: pointer;
-      transition: var(--transition);
-      flex-shrink: 0;
-    }
-
-    .header-btn:hover {
-      background: rgba(255, 255, 255, 0.3);
-      transform: scale(1.1);
-    }
-
-    .chat-main {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-      min-height: 0;
-    }
-
-    .sidebar {
-      width: var(--sidebar-width);
-      background: var(--light-gray);
-      padding: 15px;
-      border-right: 1px solid rgba(0, 0, 0, 0.05);
-      display: flex;
-      flex-direction: column;
-      transition: var(--transition);
-    }
-
-    .sidebar-title {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 15px;
-      color: var(--dark);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .user-list {
+    #messages {
       flex: 1;
       overflow-y: auto;
-    }
-
-    .user-item {
-      padding: 10px 12px;
-      border-radius: 12px;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      transition: var(--transition);
-      background: rgba(255, 255, 255, 0.7);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      cursor: pointer;
-      border: 1px solid rgba(0, 0, 0, 0.05);
-    }
-
-    .user-item:hover {
-      transform: translateX(5px);
-      background: rgba(255, 255, 255, 0.9);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-
-    .dark-mode .user-item {
-      background: rgba(40, 40, 50, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .dark-mode .user-item:hover {
-      background: rgba(50, 50, 60, 0.8);
-    }
-
-    .user-avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: var(--primary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: bold;
-      font-size: 16px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-      flex-shrink: 0;
-    }
-
-    .user-info {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .user-name {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--dark);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .user-status {
-      font-size: 12px;
-      color: var(--gray);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .user-status.online {
-      color: var(--success);
-    }
-
-    .user-status.away {
-      color: var(--warning);
-    }
-
-    .chat-area {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      min-width: 0;
-    }
-
-    .messages-container {
-      flex: 1;
-      padding: 15px;
-      overflow-y: auto;
-      background: var(--light);
-      display: flex;
-      flex-direction: column;
-      transition: var(--transition);
-      min-height: 0;
+      padding: 10px;
+      background: #dcf8c6;
     }
 
     .message {
-      max-width: 85%;
-      padding: 12px 16px;
-      border-radius: 18px;
-      margin-bottom: 15px;
-      position: relative;
-      animation: messageAppear 0.4s ease-out;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-      word-wrap: break-word;
-      transition: var(--transition);
-    }
-
-    .message-self {
-      align-self: flex-end;
-      background: var(--message-self);
-      border-bottom-right-radius: 5px;
-    }
-
-    .message-other {
-      align-self: flex-start;
-      background: var(--message-other);
-      border-bottom-left-radius: 5px;
-    }
-
-    .message-header {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 6px;
-    }
-
-    .message-sender {
-      font-weight: 600;
-      color: var(--primary);
-      font-size: 14px;
-    }
-
-    .message-time {
-      font-size: 12px;
-      color: var(--gray);
-      margin-left: 10px;
-    }
-
-    .message-content {
-      line-height: 1.4;
-      font-size: 15px;
-      color: var(--dark);
-    }
-
-    .message-media {
-      margin-top: 12px;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-
-    .message-media img, .message-media video {
-      max-width: 100%;
-      max-height: 200px;
-      display: block;
-      border-radius: 8px;
-    }
-
-    .message-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 10px;
-      opacity: 0;
-      transition: var(--transition);
-    }
-
-    .message:hover .message-actions {
-      opacity: 1;
-    }
-
-    .action-btn {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(255, 255, 255, 0.5);
-      border: none;
-      cursor: pointer;
-      color: var(--gray);
-      transition: var(--transition);
-    }
-
-    .action-btn:hover {
-      background: var(--primary);
-      color: white;
-      transform: scale(1.1);
-    }
-
-    .typing-indicator {
-      padding: 10px 15px;
-      background: var(--light-gray);
-      border-radius: 18px;
-      align-self: flex-start;
-      margin-bottom: 12px;
-      display: none;
-      animation: fadeIn 0.3s;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      font-size: 14px;
-    }
-
-    .typing-indicator span {
-      height: 8px;
-      width: 8px;
-      background: var(--gray);
-      border-radius: 50%;
-      display: inline-block;
-      margin-right: 5px;
-      animation: bounce 1.3s infinite;
-    }
-
-    .typing-indicator span:nth-child(2) {
-      animation-delay: 0.15s;
-    }
-
-    .typing-indicator span:nth-child(3) {
-      animation-delay: 0.3s;
-    }
-
-    .chat-controls {
-      padding: 15px;
-      background: var(--light-gray);
-      border-top: 1px solid rgba(0, 0, 0, 0.05);
-      transition: var(--transition);
-    }
-
-    .message-form {
-      display: flex;
-      gap: 10px;
-    }
-
-    .input-group {
-      flex: 1;
-      display: flex;
-      background: white;
-      border-radius: 50px;
-      overflow: hidden;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-      transition: var(--transition);
-      min-width: 0;
-    }
-
-    .input-group:focus-within {
-      box-shadow: 0 4px 20px rgba(67, 97, 238, 0.3);
-    }
-
-    .input-group input {
-      flex: 1;
-      padding: 12px 20px;
-      border: none;
-      outline: none;
-      font-size: 16px;
-      background: transparent;
-      color: var(--dark);
-      min-width: 50px;
-    }
-
-    .action-buttons {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      padding: 0 10px;
-      flex-shrink: 0;
-    }
-
-    .action-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      color: var(--gray);
-      transition: var(--transition);
-      font-size: 16px;
-    }
-
-    .action-btn:hover {
-      background: var(--light);
-      color: var(--primary);
-      transform: scale(1.1);
-    }
-
-    .emoji-picker {
-      position: absolute;
-      bottom: 70px;
-      right: 15px;
-      background: white;
-      border-radius: 18px;
-      padding: 15px;
-      box-shadow: var(--shadow);
-      display: none;
-      z-index: 100;
-      animation: slideUp 0.3s ease-out;
-      width: 280px;
-      max-height: 250px;
-      overflow-y: auto;
-      transition: var(--transition);
-    }
-
-    .dark-mode .emoji-picker {
-      background: #2d3748;
-    }
-
-    .emoji-picker.active {
-      display: grid;
-      grid-template-columns: repeat(8, 1fr);
-      gap: 8px;
-    }
-
-    .emoji {
-      font-size: 22px;
-      text-align: center;
-      cursor: pointer;
-      padding: 6px;
-      border-radius: 8px;
-      transition: var(--transition);
-    }
-
-    .emoji:hover {
-      background: var(--light-gray);
-      transform: scale(1.2);
-    }
-
-    .send-btn {
-      background: var(--primary);
-      color: white;
-      border: none;
-      border-radius: 50px;
-      padding: 0 20px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: var(--transition);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      font-size: 15px;
-      box-shadow: 0 4px 15px rgba(67, 97, 238, 0.4);
-      flex-shrink: 0;
-      height: 40px;
-    }
-
-    .send-btn:hover {
-      background: var(--primary-dark);
-      transform: translateY(-3px);
-      box-shadow: 0 6px 20px rgba(67, 97, 238, 0.5);
-    }
-
-    .notification {
-      position: fixed;
-      top: 15px;
-      right: 15px;
-      background: white;
-      padding: 15px 20px;
-      border-radius: 12px;
-      box-shadow: var(--shadow);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      z-index: 1000;
-      animation: slideIn 0.5s, fadeOut 0.5s 2.5s forwards;
-      max-width: 300px;
-      transition: var(--transition);
-    }
-
-    .dark-mode .notification {
-      background: #2d3748;
-      color: white;
-    }
-
-    .notification-icon {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: var(--success);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 12px;
-      flex-shrink: 0;
-    }
-
-    .search-container {
-      padding: 12px;
-      background: var(--light);
-      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-      display: flex;
-      transition: var(--transition);
-    }
-
-    .search-box {
-      flex: 1;
-      position: relative;
-    }
-
-    .search-box input {
-      width: 100%;
-      padding: 10px 15px 10px 40px;
-      border-radius: 50px;
-      border: none;
-      background: var(--light-gray);
-      font-size: 15px;
-      color: var(--dark);
-      transition: var(--transition);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-
-    .search-box input:focus {
-      box-shadow: 0 4px 15px rgba(67, 97, 238, 0.2);
-      outline: none;
-    }
-
-    .search-icon {
-      position: absolute;
-      left: 15px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--gray);
-      font-size: 16px;
-    }
-
-    .reaction-picker {
-      position: absolute;
-      bottom: 100%;
-      right: 0;
-      background: white;
-      border-radius: 24px;
-      padding: 8px;
-      box-shadow: var(--shadow);
-      display: flex;
-      gap: 4px;
-      z-index: 50;
-      animation: slideUp 0.3s ease-out;
-      display: none;
-      flex-wrap: wrap;
-      width: 180px;
-    }
-
-    .dark-mode .reaction-picker {
-      background: #2d3748;
-    }
-
-    .reaction {
-      font-size: 18px;
-      padding: 4px;
-      cursor: pointer;
-      transition: var(--transition);
-    }
-
-    .reaction:hover {
-      transform: scale(1.3);
-    }
-
-    .reactions-container {
-      display: flex;
-      gap: 5px;
-      margin-top: 8px;
-      flex-wrap: wrap;
-    }
-
-    .reaction-badge {
-      background: rgba(255, 255, 255, 0.7);
-      border-radius: 12px;
-      padding: 3px 8px;
-      font-size: 13px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    }
-
-    /* Mobile sidebar toggle button */
-    .mobile-sidebar-toggle {
-      display: none;
-      margin-right: 8px;
-      flex-shrink: 0;
-    }
-
-    /* Mobile sidebar styles */
-    .sidebar-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      z-index: 999;
-      display: none;
-    }
-
-    /* Mobile mode button */
-    .mobile-mode-btn {
-      position: fixed;
-      bottom: 15px;
-      right: 15px;
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      background: var(--primary);
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: var(--shadow);
-      z-index: 1000;
-      cursor: pointer;
-      transition: var(--transition);
-      animation: pulse 2s infinite;
-    }
-
-    .mobile-mode-btn:hover {
-      transform: scale(1.1);
-      background: var(--primary-dark);
-    }
-
-    /* Highlight for search results */
-    .highlight {
-      background-color: yellow;
-      color: black;
-      padding: 0 2px;
-      border-radius: 3px;
-    }
-
-    /* Animations */
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-
-    @keyframes fadeOut {
-      from { opacity: 1; }
-      to { opacity: 0; }
-    }
-
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-
-    @keyframes slideUp {
-      from { transform: translateY(20px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-
-    @keyframes messageAppear {
-      from { transform: translateY(20px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-      100% { transform: scale(1); }
-    }
-
-    @keyframes blink {
-      0% { opacity: 1; }
-      50% { opacity: 0.5; }
-      100% { opacity: 1; }
-    }
-
-    @keyframes bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-6px); }
-    }
-
-    /* Scrollbar styling */
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.05);
-      border-radius: 10px;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.1);
-      border-radius: 10px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(0, 0, 0, 0.2);
-    }
-
-    /* Responsive design */
-    @media (max-width: 992px) {
-      .sidebar {
-        width: 220px;
-      }
-    }
-
-    @media (max-width: 768px) {
-      body {
-        padding: 0;
-      }
-      
-      .chat-container {
-        height: 100vh;
-        border-radius: 0;
-      }
-      
-      .sidebar {
-        position: fixed;
-        top: 0;
-        left: -100%;
-        height: 100%;
-        z-index: 1000;
-        transition: left 0.3s ease;
-        width: 80%;
-        max-width: 300px;
-      }
-      
-      .sidebar.active {
-        left: 0;
-      }
-      
-      .mobile-sidebar-toggle {
-        display: block;
-      }
-      
-      .message {
-        max-width: 90%;
-      }
-      
-      .app-title {
-        font-size: 1rem;
-      }
-      
-      .input-group input {
-        padding: 10px 15px;
-        font-size: 15px;
-      }
-      
-      .send-btn {
-        padding: 0 15px;
-        font-size: 14px;
-      }
-      
-      .sidebar-overlay {
-        display: block;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.3s ease;
-      }
-      
-      .sidebar-overlay.active {
-        opacity: 1;
-        pointer-events: all;
-      }
-      
-      .emoji-picker {
-        width: 260px;
-        max-height: 220px;
-        bottom: 65px;
-        right: 10px;
-        grid-template-columns: repeat(7, 1fr);
-      }
-      
-      .mobile-mode-btn {
-        bottom: 70px;
-        right: 15px;
-        width: 45px;
-        height: 45px;
-      }
-    }
-    
-    /* Mobile mode specific styles */
-    body.mobile-mode {
-      padding: 0;
-    }
-    
-    body.mobile-mode .chat-container {
-      height: 100vh;
-      border-radius: 0;
-    }
-    
-    body.mobile-mode .chat-header {
+      max-width: 75%;
+      margin: 5px;
       padding: 8px 12px;
+      border-radius: 10px;
+      clear: both;
+      display: inline-block;
+      word-wrap: break-word;
     }
-    
-    body.mobile-mode .messages-container {
+
+    .sender {
+      background: #dcf8c6;
+      float: right;
+      text-align: right;
+    }
+
+    .receiver {
+      background: #fff;
+      float: left;
+    }
+
+    .username {
+      font-weight: bold;
+      color: #075e54;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .system {
+      text-align: center;
+      color: #666;
+      font-size: 0.8rem;
+      margin: 10px 0;
+    }
+
+    #form {
+      display: flex;
       padding: 10px;
+      background: #f0f0f0;
+      align-items: center;
+      gap: 5px;
     }
-    
-    body.mobile-mode .input-group input {
-      padding: 10px 15px;
-      font-size: 15px;
+
+    #input {
+      flex: 1;
+      padding: 10px;
+      border-radius: 20px;
+      border: 1px solid #ccc;
     }
-    
-    body.mobile-mode .send-btn {
-      padding: 0 15px;
-      font-size: 14px;
+
+    #emoji-btn,
+    button[type='submit'],
+    #image-input-label {
+      background: #25D366;
+      border: none;
+      color: white;
+      padding: 10px;
+      border-radius: 50%;
+      font-size: 16px;
+      cursor: pointer;
     }
-    
-    body.mobile-mode .message {
-      max-width: 92%;
-      padding: 10px 14px;
+
+    #image-input {
+      display: none;
     }
-    
-    body.mobile-mode .app-title {
-      font-size: 0.95rem;
-    }
-    
-    body.mobile-mode .logo {
-      font-size: 22px;
-    }
-    
-    body.mobile-mode .mobile-mode-btn {
-      background: var(--danger);
-    }
-    
-    /* Portrait mode optimization */
-    @media (max-width: 480px) and (orientation: portrait) {
-      .action-buttons {
-        display: none;
-      }
-      
-      .input-group input {
-        padding-left: 15px;
-      }
-      
-      .header-actions {
-        gap: 5px;
-      }
-      
-      .header-btn {
-        width: 30px;
-        height: 30px;
-        font-size: 14px;
-      }
-      
-      .online-indicator {
-        font-size: 12px;
-      }
-      
-      .mobile-mode-btn {
-        bottom: 60px;
-      }
+
+    img.chat-image {
+      max-width: 100%;
+      border-radius: 10px;
+      margin-top: 5px;
     }
   </style>
 </head>
 <body>
-  <div class="mobile-mode-btn" id="mobile-mode-btn">
-    <i class="fas fa-mobile-alt"></i>
-  </div>
-  
-  <div class="chat-container">
-    <div class="chat-header">
-      <div class="header-left">
-        <button class="header-btn mobile-sidebar-toggle" id="mobile-sidebar-toggle">
-          <i class="fas fa-bars"></i>
-        </button>
-        <div class="logo"><i class="fas fa-comment-dots"></i></div>
-        <div class="app-title">Super Chat Pro</div>
-        <div class="online-indicator">
-          <div class="indicator"></div>
-          <span id="online-count">0</span>
-        </div>
-      </div>
-      <div class="header-actions">
-        <button class="header-btn" id="dark-mode-btn">
-          <i class="fas fa-moon"></i>
-        </button>
-        <button class="header-btn" id="search-btn">
-          <i class="fas fa-search"></i>
-        </button>
-        <div class="menu-wrapper">
-          <button class="header-btn" id="menu-btn">
-            <i class="fas fa-ellipsis-v"></i>
-          </button>
-          <div class="menu-dropdown" id="menu-dropdown">
-            <button class="menu-item" id="clear-chat"><i class="fas fa-eraser"></i> Clear Chat</button>
-            <button class="menu-item" id="settings"><i class="fas fa-cog"></i> Settings</button>
-            <button class="menu-item" id="about"><i class="fas fa-info-circle"></i> About</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <div class="search-container" id="search-container" style="display: none;">
-      <div class="search-box">
-        <i class="fas fa-search search-icon"></i>
-        <input type="text" id="search-input" placeholder="Search messages...">
-      </div>
-    </div>
-    
-    <div class="sidebar-overlay" id="sidebar-overlay"></div>
-    
-    <div class="chat-main">
-      <div class="sidebar" id="sidebar">
-        <div class="sidebar-title"><i class="fas fa-users"></i> Online Users</div>
-        <div class="user-list" id="user-list">
-          <!-- Users will be dynamically added here -->
-        </div>
-      </div>
-      
-      <div class="chat-area">
-        <div class="messages-container" id="messages">
-          <div class="typing-indicator" id="typing-indicator">
-            <span></span>
-            <span></span>
-            <span></span>
-            <span>typing...</span>
-          </div>
-          <!-- Messages will be dynamically added here -->
-        </div>
-        
-        <div class="chat-controls">
-          <form class="message-form" id="form">
-            <div class="input-group">
-              <input type="text" id="input" autocomplete="off" placeholder="Type a message..." />
-              <div class="action-buttons">
-                <button type="button" class="action-btn" id="emoji-btn">
-                  <i class="far fa-smile"></i>
-                </button>
-                <button type="button" class="action-btn" id="file-btn">
-                  <i class="fas fa-paperclip"></i>
-                </button>
-                <button type="button" class="action-btn" id="gif-btn">
-                  <i class="fas fa-film"></i>
-                </button>
-              </div>
-            </div>
-            <input type="file" id="file" accept="image/*,video/*" style="display: none;">
-            <button class="send-btn" type="submit">
-              <i class="fas fa-paper-plane"></i>
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-    
-    <div class="emoji-picker" id="emoji-picker">
-      <!-- Emojis will be dynamically added here -->
-    </div>
-  </div>
-  
-  <div class="notification" id="notification">
-    <div class="notification-icon">
-      <i class="fas fa-bell"></i>
-    </div>
-    <div class="notification-content" id="notification-content">
-      Welcome to Super Chat Pro!
-    </div>
+  <div id="chat-container">
+    <header>
+      WhatsApp Clone
+      <span id="online-count">Online: 0</span>
+    </header>
+    <div id="user-list">Users:</div>
+    <div id="messages"></div>
+    <form id="form">
+      <label id="image-input-label" for="image-input">📷</label>
+      <input type="file" id="image-input" accept="image/*" />
+      <button type="button" id="emoji-btn">😊</button>
+      <input id="input" autocomplete="off" placeholder="Type a message..." required />
+      <button type="submit">➤</button>
+    </form>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    // DOM elements
     const socket = io();
+    let name = '';
+
+    while (!name) {
+      name = prompt("Enter your name:");
+    }
+
+    socket.emit('user joined', name);
+
     const form = document.getElementById('form');
     const input = document.getElementById('input');
-    const fileInput = document.getElementById('file');
     const messages = document.getElementById('messages');
-    const userList = document.getElementById('user-list');
     const onlineCount = document.getElementById('online-count');
-    const typingIndicator = document.getElementById('typing-indicator');
     const emojiBtn = document.getElementById('emoji-btn');
-    const emojiPicker = document.getElementById('emoji-picker');
-    const fileBtn = document.getElementById('file-btn');
-    const notification = document.getElementById('notification');
-    const notificationContent = document.getElementById('notification-content');
-    const darkModeBtn = document.getElementById('dark-mode-btn');
-    const searchBtn = document.getElementById('search-btn');
-    const searchContainer = document.getElementById('search-container');
-    const searchInput = document.getElementById('search-input');
-    const gifBtn = document.getElementById('gif-btn');
-    const menuBtn = document.getElementById('menu-btn');
-    const menuDropdown = document.getElementById('menu-dropdown');
-    const clearChatBtn = document.getElementById('clear-chat');
-    const settingsBtn = document.getElementById('settings');
-    const aboutBtn = document.getElementById('about');
-    const mobileSidebarToggle = document.getElementById('mobile-sidebar-toggle');
-    const sidebar = document.getElementById('sidebar');
-    const sidebarOverlay = document.getElementById('sidebar-overlay');
-    const mobileModeBtn = document.getElementById('mobile-mode-btn');
-    
-    // User data
-    let username = localStorage.getItem('chatUsername') || "";
-    if (!username) {
-      username = prompt("Enter your name:") || "Anonymous";
-      localStorage.setItem('chatUsername', username);
-    }
-    
-    // Mobile mode state
-    let isMobileMode = localStorage.getItem('mobileMode') === 'true';
-    
-    // Apply initial mobile mode
-    function applyMobileMode() {
-      if (isMobileMode) {
-        document.body.classList.add('mobile-mode');
-        mobileModeBtn.innerHTML = '<i class="fas fa-desktop"></i>';
-        showNotification("Mobile mode enabled");
-      } else {
-        document.body.classList.remove('mobile-mode');
-        mobileModeBtn.innerHTML = '<i class="fas fa-mobile-alt"></i>';
-      }
-    }
-    
-    applyMobileMode();
-    
-    // Toggle mobile mode
-    mobileModeBtn.addEventListener('click', () => {
-      isMobileMode = !isMobileMode;
-      localStorage.setItem('mobileMode', isMobileMode);
-      applyMobileMode();
-    });
-    
-    // Toggle mobile sidebar
-    function toggleMobileSidebar() {
-      sidebar.classList.toggle('active');
-      sidebarOverlay.classList.toggle('active');
-    }
-    
-    mobileSidebarToggle.addEventListener('click', toggleMobileSidebar);
-    sidebarOverlay.addEventListener('click', toggleMobileSidebar);
-    
-    // Menu button functionality
-    menuBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      menuDropdown.classList.toggle('active');
-    });
-    
-    // Close menu when clicking outside
-    document.addEventListener('click', (e) => {
-      if (!menuDropdown.contains(e.target) && !menuBtn.contains(e.target)) {
-        menuDropdown.classList.remove('active');
-      }
-      
-      // Also close sidebar if open
-      if (sidebar.classList.contains('active')) {
-        toggleMobileSidebar();
-      }
-    });
-    
-    // Clear chat functionality
-    clearChatBtn.addEventListener('click', () => {
-      if (confirm("Are you sure you want to clear the chat?")) {
-        messages.innerHTML = '<div class="typing-indicator" id="typing-indicator"><span></span><span></span><span></span><span>typing...</span></div>';
-        showNotification("Chat cleared");
-      }
-      menuDropdown.classList.remove('active');
-    });
-    
-    // Settings functionality
-    settingsBtn.addEventListener('click', () => {
-      const newName = prompt("Change your name:", username);
-      if (newName && newName.trim() !== "") {
-        username = newName.trim();
-        localStorage.setItem('chatUsername', username);
-        socket.emit('user name change', username);
-        showNotification(`Name changed to ${username}`);
-      }
-      menuDropdown.classList.remove('active');
-    });
-    
-    // About functionality
-    aboutBtn.addEventListener('click', () => {
-      showNotification("Super Chat Pro v1.0 - Real-time chat application");
-      menuDropdown.classList.remove('active');
-    });
-    
-    // Search functionality
-    let searchTerm = "";
-    searchInput.addEventListener('input', () => {
-      searchTerm = searchInput.value.trim().toLowerCase();
-      highlightMessages();
-    });
-    
-    function highlightMessages() {
-      const messageElements = document.querySelectorAll('.message-content');
-      
-      messageElements.forEach(element => {
-        const originalText = element.dataset.original || element.textContent;
-        element.dataset.original = originalText;
-        
-        if (!searchTerm) {
-          element.innerHTML = originalText;
-          return;
-        }
-        
-        const regex = new RegExp(`(${searchTerm})`, 'gi');
-        const highlighted = originalText.replace(regex, '<span class="highlight">$1</span>');
-        element.innerHTML = highlighted;
-      });
-    }
-    
-    // Toggle search
-    searchBtn.addEventListener('click', () => {
-      const isVisible = searchContainer.style.display === 'flex';
-      searchContainer.style.display = isVisible ? 'none' : 'flex';
-      if (!isVisible) {
-        searchInput.focus();
-      }
-    });
-    
-    // Show notification
-    function showNotification(message) {
-      notificationContent.textContent = message;
-      notification.style.display = 'flex';
-      setTimeout(() => {
-        notification.style.animation = 'fadeOut 0.5s forwards';
-        setTimeout(() => {
-          notification.style.display = 'none';
-          notification.style.animation = '';
-        }, 500);
-      }, 2500);
-    }
-    
-    // Format time
-    function formatTime(date) {
-      return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    
-    // Submit form
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      const message = input.value.trim();
-      const file = fileInput.files[0];
-      
-      if (!message && !file) return;
-      
-      // Show typing indicator
-      socket.emit('typing', username);
-      
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          socket.emit('chat message', {
-            name: username,
-            text: message,
-            media: {
-              name: file.name,
-              type: file.type,
-              data: reader.result
-            },
-            timestamp: new Date().toISOString(),
-            id: Date.now().toString()
-          });
-        };
-        reader.readAsDataURL(file);
-      } else {
-        socket.emit('chat message', {
-          name: username,
-          text: message,
-          timestamp: new Date().toISOString(),
-          id: Date.now().toString()
-        });
-      }
-      
-      input.value = '';
-      fileInput.value = '';
-      emojiPicker.classList.remove('active');
-      
-      // Hide typing indicator after a short delay
-      setTimeout(() => {
-        socket.emit('stop typing');
-      }, 1000);
-    });
-    
-    // Input typing events
-    let typingTimeout;
-    input.addEventListener('input', () => {
-      socket.emit('typing', username);
-      
-      clearTimeout(typingTimeout);
-      typingTimeout = setTimeout(() => {
-        socket.emit('stop typing');
-      }, 2000);
-    });
-    
-    // File button click
-    fileBtn.addEventListener('click', () => {
-      fileInput.click();
-    });
-    
-    // GIF button functionality
-    gifBtn.addEventListener('click', () => {
-      showNotification("GIF feature coming soon!");
-    });
-    
-    // Create reaction picker
-    function createReactionPicker(messageId) {
-      const picker = document.createElement('div');
-      picker.className = 'reaction-picker';
-      picker.id = `reaction-picker-${messageId}`;
-      
-      const reactions = ["❤️", "👍", "👎", "😂", "😮", "😢", "🎉", "🤔"];
-      
-      reactions.forEach(reaction => {
-        const el = document.createElement('div');
-        el.className = 'reaction';
-        el.textContent = reaction;
-        el.addEventListener('click', () => {
-          socket.emit('add reaction', { messageId, reaction });
-          picker.style.display = 'none';
-        });
-        picker.appendChild(el);
-      });
-      
-      return picker;
-    }
-    
-    // Add reaction to message
-    function addReactionToMessage(messageId, reaction, userId) {
-      const messageElement = document.querySelector(`.message[data-id="${messageId}"]`);
-      if (messageElement) {
-        let reactionsContainer = messageElement.querySelector('.reactions-container');
-        if (!reactionsContainer) {
-          reactionsContainer = document.createElement('div');
-          reactionsContainer.className = 'reactions-container';
-          messageElement.appendChild(reactionsContainer);
-        }
-        
-        const reactionBadge = document.createElement('div');
-        reactionBadge.className = 'reaction-badge';
-        reactionBadge.innerHTML = `${reaction} <span class="reaction-count">1</span>`;
-        reactionBadge.dataset.reaction = reaction;
-        reactionsContainer.appendChild(reactionBadge);
-      }
-    }
-    
-    // Socket events
-    socket.on('chat message', (msg) => {
-      const li = document.createElement('div');
-      const isSelf = msg.name === username;
-      
-      li.className = `message ${isSelf ? 'message-self' : 'message-other'}`;
-      li.dataset.id = msg.id;
-      
-      li.innerHTML = `
-        <div class="message-header">
-          <span class="message-sender">${msg.name}</span>
-          <span class="message-time">${formatTime(msg.timestamp)}</span>
-        </div>
-        <div class="message-content">
-          ${msg.text || ''}
-        </div>
-        <div class="message-actions">
-          <button class="action-btn react-btn"><i class="far fa-smile"></i></button>
-          ${isSelf ? `<button class="action-btn edit-btn"><i class="far fa-edit"></i></button>` : ''}
-        </div>
-      `;
-      
-      if (msg.media) {
-        const media = document.createElement('div');
-        media.className = 'message-media';
-        
-        if (msg.media.type.startsWith('image')) {
-          const img = document.createElement('img');
-          img.src = msg.media.data;
-          media.appendChild(img);
-        } else if (msg.media.type.startsWith('video')) {
-          const video = document.createElement('video');
-          video.src = msg.media.data;
-          video.controls = true;
-          media.appendChild(video);
-        }
-        
-        li.querySelector('.message-content').appendChild(media);
-      }
-      
-      // Add reaction picker
-      const reactionPicker = createReactionPicker(msg.id);
-      li.appendChild(reactionPicker);
-      
-      // Add reaction button event
-      const reactBtn = li.querySelector('.react-btn');
-      reactBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const picker = li.querySelector('.reaction-picker');
-        picker.style.display = picker.style.display === 'flex' ? 'none' : 'flex';
-      });
-      
-      // Add edit button event
-      if (isSelf) {
-        const editBtn = li.querySelector('.edit-btn');
-        editBtn.addEventListener('click', () => {
-          const newText = prompt("Edit your message:", msg.text);
-          if (newText !== null) {
-            socket.emit('edit message', { messageId: msg.id, newText });
-          }
-        });
-      }
-      
-      messages.appendChild(li);
+    const userList = document.getElementById('user-list');
+    const imageInput = document.getElementById('image-input');
+
+    function appendMessage(data, isSender = false) {
+      const msg = document.createElement('div');
+      msg.className = 'message ' + (isSender ? 'sender' : 'receiver');
+      msg.innerHTML = `<span class="username">${data.name}</span>${data.message}`;
+      messages.appendChild(msg);
       messages.scrollTop = messages.scrollHeight;
-      
-      // Notification for new messages not from self
-      if (!isSelf) {
-        showNotification(`New message from ${msg.name}`);
-      }
-    });
-    
-    socket.on('user connected', (user) => {
-      showNotification(`${user.name} joined the chat`);
-      updateUserList(user.users);
-    });
-    
-    socket.on('user disconnected', (user) => {
-      showNotification(`${user.name} left the chat`);
-      updateUserList(user.users);
-    });
-    
-    socket.on('typing', (username) => {
-      typingIndicator.style.display = 'flex';
-      typingIndicator.innerHTML = `
-        <span></span>
-        <span></span>
-        <span></span>
-        <span>${username} is typing...</span>
-      `;
-    });
-    
-    socket.on('stop typing', () => {
-      typingIndicator.style.display = 'none';
-    });
-    
-    socket.on('online count', (count) => {
-      onlineCount.textContent = count;
-    });
-    
-    socket.on('load messages', (msgs) => {
-      msgs.forEach(msg => {
+    }
+
+    function appendImageMessage(data, isSender = false) {
+      const msg = document.createElement('div');
+      msg.className = 'message ' + (isSender ? 'sender' : 'receiver');
+      msg.innerHTML = `<span class="username">${data.name}</span><img class="chat-image" src="${data.imageUrl}" alt="Image" />`;
+      messages.appendChild(msg);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function appendSystemMessage(text) {
+      const msg = document.createElement('div');
+      msg.className = 'system';
+      msg.innerText = text;
+      messages.appendChild(msg);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (input.value) {
+        const msg = { name, message: input.value };
         socket.emit('chat message', msg);
-      });
-    });
-    
-    socket.on('add reaction', ({ messageId, reaction, userId }) => {
-      addReactionToMessage(messageId, reaction, userId);
-    });
-    
-    socket.on('message edited', ({ messageId, newText }) => {
-      const messageElement = document.querySelector(`.message[data-id="${messageId}"]`);
-      if (messageElement) {
-        messageElement.querySelector('.message-content').innerHTML = newText;
-        messageElement.querySelector('.message-time').innerHTML += ' (edited)';
+        appendMessage(msg, true);
+        input.value = '';
       }
     });
-    
-    socket.on('user name changed', ({ oldName, newName }) => {
-      // Update all messages with the old name
-      document.querySelectorAll('.message-sender').forEach(el => {
-        if (el.textContent === oldName) {
-          el.textContent = newName;
-        }
-      });
-      
-      // Update user list
-      const userItems = document.querySelectorAll('.user-name');
-      userItems.forEach(item => {
-        if (item.textContent === oldName) {
-          item.textContent = newName;
-        }
-      });
+
+    emojiBtn.addEventListener('click', () => {
+      input.value += '😊';
+      input.focus();
     });
-    
-    // Update user list
-    function updateUserList(users) {
-      userList.innerHTML = '';
-      users.forEach(user => {
-        const userEl = document.createElement('div');
-        userEl.className = 'user-item';
-        
-        const firstLetter = user.name.charAt(0).toUpperCase();
-        const statusClass = user.status === 'away' ? 'away' : user.online ? 'online' : '';
-        
-        userEl.innerHTML = `
-          <div class="user-avatar" style="background: ${stringToColor(user.name)}">${firstLetter}</div>
-          <div class="user-info">
-            <div class="user-name">${user.name}</div>
-            <div class="user-status ${statusClass}">${user.status || (user.online ? 'Online' : 'Offline')}</div>
-          </div>
-        `;
-        
-        userList.appendChild(userEl);
-      });
-    }
-    
-    // Generate color from string
-    function stringToColor(str) {
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+
+    imageInput.addEventListener('change', () => {
+      const file = imageInput.files[0];
+      if (file) {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        fetch('/upload', {
+          method: 'POST',
+          body: formData,
+        })
+          .then(res => res.json())
+          .then(data => {
+            const msg = { name, imageUrl: data.imageUrl };
+            socket.emit('chat image', msg);
+            appendImageMessage(msg, true);
+          })
+          .catch(() => alert("Upload failed"));
       }
-      const color = `hsl(${hash % 360}, 70%, 60%)`;
-      return color;
-    }
-    
-    // Close emoji picker when clicking outside
-    document.addEventListener('click', (e) => {
-      if (!emojiBtn.contains(e.target) && !emojiPicker.contains(e.target)) {
-        emojiPicker.classList.remove('active');
+    });
+
+    input.addEventListener('input', () => {
+      socket.emit('typing', name);
+    });
+
+    socket.on('chat message', data => {
+      if (data.name !== name) {
+        appendMessage(data, false);
       }
-      
-      // Hide all reaction pickers
-      document.querySelectorAll('.reaction-picker').forEach(picker => {
-        if (!picker.contains(e.target) && 
-            !picker.previousElementSibling.contains(e.target)) {
-          picker.style.display = 'none';
-        }
-      });
     });
-    
-    // Initialize emoji picker
-    const emojis = ["😀", "😂", "🥰", "😎", "🤩", "😍", "🤗", "👍", "👋", "🎉", 
-                   "❤️", "🔥", "✨", "💯", "👏", "🙌", "🤝", "👀", "💬", "💭",
-                   "🤔", "🙄", "😴", "🥱", "😠", "🥺", "🤯", "🤪", "😜", "🤓"];
-    
-    emojis.forEach(emoji => {
-      const el = document.createElement('div');
-      el.className = 'emoji';
-      el.textContent = emoji;
-      el.addEventListener('click', () => {
-        input.value += emoji;
-        input.focus();
-      });
-      emojiPicker.appendChild(el);
+
+    socket.on('chat image', data => {
+      if (data.name !== name) {
+        appendImageMessage(data, false);
+      }
     });
-    
-    // Toggle emoji picker
-    emojiBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      emojiPicker.classList.toggle('active');
+
+    socket.on('user joined', user => {
+      appendSystemMessage(`${user} joined the chat`);
     });
-    
-    // Toggle dark mode
-    darkModeBtn.addEventListener('click', () => {
-      document.body.classList.toggle('dark-mode');
-      localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
-      darkModeBtn.innerHTML = document.body.classList.contains('dark-mode') ? 
-        '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
-      showNotification(document.body.classList.contains('dark-mode') ? "Dark mode enabled" : "Light mode enabled");
+
+    socket.on('user left', user => {
+      appendSystemMessage(`${user} left the chat`);
     });
-    
-    // Set initial dark mode state
-    if (localStorage.getItem('darkMode') === 'true') {
-      document.body.classList.add('dark-mode');
-      darkModeBtn.innerHTML = '<i class="fas fa-sun"></i>';
-    }
-    
-    // Initialize user
-    socket.emit('user connected', { name: username });
-    
-    // Show welcome message
-    showNotification(`Welcome to Super Chat Pro, ${username}!`);
+
+    socket.on('typing', user => {
+      if (user !== name) {
+        userList.innerText = `${user} is typing...`;
+        clearTimeout(window.typingTimeout);
+        window.typingTimeout = setTimeout(() => {
+          userList.innerText = '';
+        }, 2000);
+      }
+    });
+
+    socket.on('online users', data => {
+      onlineCount.innerText = `Online: ${data.count}`;
+      if (!window.typingTimeout) {
+        userList.innerText = `Users: ${data.users.join(', ')}`;
+      }
+    });
   </script>
 </body>
 </html>
