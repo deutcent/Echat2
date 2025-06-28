@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -12,25 +11,22 @@ const io = socketIo(server);
 
 let onlineUsers = new Map();
 
-// Serve static files and uploaded images
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Configure Multer for image uploads
+// Image Upload Setup
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
+  destination: (req, file, cb) => {
     const dir = path.join(__dirname, 'uploads');
     if (!fs.existsSync(dir)) fs.mkdirSync(dir);
     cb(null, dir);
   },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + '-' + file.originalname);
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + '-' + file.originalname);
   }
 });
-const upload = multer({ storage: storage });
+const upload = multer({ storage });
 
-// Image upload endpoint
 app.post('/upload', upload.single('image'), (req, res) => {
   if (req.file) {
     res.json({ imageUrl: `/uploads/${req.file.filename}` });
@@ -39,7 +35,6 @@ app.post('/upload', upload.single('image'), (req, res) => {
   }
 });
 
-// Socket.IO event handlers
 io.on('connection', socket => {
   let userName = '';
 
@@ -67,6 +62,10 @@ io.on('connection', socket => {
     socket.broadcast.emit('typing', name);
   });
 
+  socket.on('voice-stream', data => {
+    socket.broadcast.emit('voice-stream', data);
+  });
+
   socket.on('disconnect', () => {
     if (userName) {
       onlineUsers.delete(socket.id);
@@ -77,4 +76,4 @@ io.on('connection', socket => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
