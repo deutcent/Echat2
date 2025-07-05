@@ -56,6 +56,7 @@
       clear: both;
       display: inline-block;
       word-wrap: break-word;
+      position: relative;
     }
 
     .sender {
@@ -99,11 +100,11 @@
       border: 1px solid #ccc;
     }
 
-    #image-input {
+    #file-input {
       display: none;
     }
 
-    #image-input-label,
+    #file-input-label,
     #voice-btn,
     button[type='submit'] {
       background: #25D366;
@@ -131,6 +132,43 @@
       border-radius: 10px;
       margin-top: 5px;
     }
+
+    video.chat-video {
+      max-width: 100%;
+      border-radius: 10px;
+      margin-top: 5px;
+    }
+
+    .file-message {
+      margin-top: 5px;
+      font-size: 0.9em;
+    }
+
+    .reaction {
+      font-size: 1.2em;
+      margin-top: 5px;
+      display: inline-block;
+    }
+
+    .download-btn {
+      display: inline-block;
+      font-size: 0.8em;
+      color: #007bff;
+      cursor: pointer;
+      margin-top: 5px;
+      text-decoration: underline;
+    }
+
+    .emoji-picker {
+      position: absolute;
+      bottom: 20px;
+      right: 0;
+      z-index: 999;
+      background: white;
+      border: 1px solid #ccc;
+      padding: 5px;
+      border-radius: 10px;
+    }
   </style>
 </head>
 <body>
@@ -142,14 +180,15 @@
     <div id="user-list">Users:</div>
     <div id="messages"></div>
     <form id="form">
-      <label id="image-input-label" for="image-input">📷</label>
-      <input type="file" id="image-input" accept="image/*" />
+      <label id="file-input-label" for="file-input">📎</label>
+      <input type="file" id="file-input" />
       <button type="button" id="voice-btn">🎤</button>
       <input id="input" autocomplete="off" placeholder="Type a message..." required />
       <button type="submit">➤</button>
     </form>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/emoji-picker-element"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
@@ -165,23 +204,69 @@
     const messages = document.getElementById('messages');
     const onlineCount = document.getElementById('online-count');
     const userList = document.getElementById('user-list');
-    const imageInput = document.getElementById('image-input');
+    const fileInput = document.getElementById('file-input');
     const voiceBtn = document.getElementById('voice-btn');
 
     function appendMessage(data, isSender = false) {
       const msg = document.createElement('div');
       msg.className = 'message ' + (isSender ? 'sender' : 'receiver');
-      msg.innerHTML = `<span class="username">${data.name}</span>${data.message}`;
+      msg.dataset.id = data.id;
+
+      msg.innerHTML = `<span class="username">${data.name}</span>${data.message || ''}`;
+      if (data.reaction) {
+        msg.innerHTML += `<div class="reaction">${data.reaction}</div>`;
+      }
+
+      msg.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        openEmojiPicker(msg, data.id);
+      });
+
       messages.appendChild(msg);
       messages.scrollTop = messages.scrollHeight;
     }
 
-    function appendImageMessage(data, isSender = false) {
+    function appendFileMessage(data, isSender = false) {
       const msg = document.createElement('div');
       msg.className = 'message ' + (isSender ? 'sender' : 'receiver');
-      msg.innerHTML = `<span class="username">${data.name}</span><img class="chat-image" src="${data.imageUrl}" alt="Image" />`;
+      msg.dataset.id = data.id;
+
+      msg.innerHTML = `<span class="username">${data.name}</span>`;
+
+      if (data.mimeType.startsWith('image')) {
+        msg.innerHTML += `<img class="chat-image" src="${data.fileUrl}" alt="Image" />`;
+      } else if (data.mimeType.startsWith('video')) {
+        msg.innerHTML += `<video class="chat-video" controls src="${data.fileUrl}"></video>`;
+      } else {
+        msg.innerHTML += `<div class="file-message">📎 ${data.fileName}</div>`;
+      }
+
+      msg.innerHTML += `<div class="download-btn" onclick="downloadFile('${data.fileUrl}', '${data.fileName}')">Download</div>`;
+
+      if (data.reaction) {
+        msg.innerHTML += `<div class="reaction">${data.reaction}</div>`;
+      }
+
+      msg.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        openEmojiPicker(msg, data.id);
+      });
+
       messages.appendChild(msg);
       messages.scrollTop = messages.scrollHeight;
+    }
+
+    function openEmojiPicker(target, messageId) {
+      const picker = document.createElement('emoji-picker');
+      picker.className = 'emoji-picker';
+
+      picker.addEventListener('emoji-click', e => {
+        const emoji = e.detail.unicode;
+        socket.emit('message reaction', { id: messageId, reaction: emoji, name });
+        picker.remove();
+      });
+
+      target.appendChild(picker);
     }
 
     function appendSystemMessage(text) {
@@ -192,32 +277,43 @@
       messages.scrollTop = messages.scrollHeight;
     }
 
+    function downloadFile(url, name) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
     form.addEventListener('submit', e => {
       e.preventDefault();
       if (input.value) {
-        const msg = { name, message: input.value };
+        const id = Date.now().toString();
+        const msg = { id, name, message: input.value };
         socket.emit('chat message', msg);
         appendMessage(msg, true);
         input.value = '';
       }
     });
 
-    imageInput.addEventListener('change', () => {
-      const file = imageInput.files[0];
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
       if (file) {
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('file', file);
         fetch('/upload', {
           method: 'POST',
           body: formData,
         })
-          .then(res => res.json())
-          .then(data => {
-            const msg = { name, imageUrl: data.imageUrl };
-            socket.emit('chat image', msg);
-            appendImageMessage(msg, true);
-          })
-          .catch(() => alert("Upload failed"));
+        .then(res => res.json())
+        .then(data => {
+          const id = Date.now().toString();
+          const msg = { id, name, ...data };
+          socket.emit('chat file', msg);
+          appendFileMessage(msg, true);
+        })
+        .catch(() => alert("Upload failed"));
       }
     });
 
@@ -229,8 +325,21 @@
       if (data.name !== name) appendMessage(data, false);
     });
 
-    socket.on('chat image', data => {
-      if (data.name !== name) appendImageMessage(data, false);
+    socket.on('chat file', data => {
+      if (data.name !== name) appendFileMessage(data, false);
+    });
+
+    socket.on('message reaction', data => {
+      const msg = document.querySelector(`.message[data-id="${data.id}"]`);
+      if (msg) {
+        const oldReaction = msg.querySelector('.reaction');
+        if (oldReaction) oldReaction.remove();
+
+        const emojiDiv = document.createElement('div');
+        emojiDiv.className = 'reaction';
+        emojiDiv.textContent = data.reaction;
+        msg.appendChild(emojiDiv);
+      }
     });
 
     socket.on('user joined', user => {
@@ -299,11 +408,7 @@
 
     function stopStreaming() {
       isStreaming = false;
-      if (processor) {
-        processor.disconnect();
-        processor.onaudioprocess = null;
-        processor = null;
-      }
+      if (processor) processor.disconnect();
       if (source) source.disconnect();
       if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
       if (audioContext) audioContext.close();

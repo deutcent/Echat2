@@ -14,7 +14,7 @@ let onlineUsers = new Map();
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Image Upload Setup
+// Allow all file types
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, 'uploads');
@@ -27,11 +27,15 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-app.post('/upload', upload.single('image'), (req, res) => {
+app.post('/upload', upload.single('file'), (req, res) => {
   if (req.file) {
-    res.json({ imageUrl: `/uploads/${req.file.filename}` });
+    res.json({
+      fileUrl: `/uploads/${req.file.filename}`,
+      fileName: req.file.originalname,
+      mimeType: req.file.mimetype
+    });
   } else {
-    res.status(400).json({ error: 'No image uploaded' });
+    res.status(400).json({ error: 'No file uploaded' });
   }
 });
 
@@ -54,8 +58,8 @@ io.on('connection', socket => {
     io.emit('chat message', data);
   });
 
-  socket.on('chat image', data => {
-    io.emit('chat image', data);
+  socket.on('chat file', data => {
+    io.emit('chat file', data);
   });
 
   socket.on('typing', name => {
@@ -64,6 +68,10 @@ io.on('connection', socket => {
 
   socket.on('voice-stream', data => {
     socket.broadcast.emit('voice-stream', data);
+  });
+
+  socket.on('message reaction', data => {
+    io.emit('message reaction', data);
   });
 
   socket.on('disconnect', () => {
