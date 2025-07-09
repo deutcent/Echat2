@@ -9,13 +9,15 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
+// Keep track of online users
 let onlineUsers = new Map();
 
+// Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Allow all file types
-const storage = multer.diskStorage({
+// === IMAGE UPLOAD SETUP ===
+const imageStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, 'uploads');
     if (!fs.existsSync(dir)) fs.mkdirSync(dir);
@@ -25,20 +27,41 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + '-' + file.originalname);
   }
 });
-const upload = multer({ storage });
+const uploadImage = multer({ storage: imageStorage });
 
-app.post('/upload', upload.single('file'), (req, res) => {
+app.post('/upload', uploadImage.single('image'), (req, res) => {
+  if (req.file) {
+    res.json({ imageUrl: `/uploads/${req.file.filename}` });
+  } else {
+    res.status(400).json({ error: 'No image uploaded' });
+  }
+});
+
+// === FILE UPLOAD SETUP (for any type of file) ===
+const fileStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
+});
+const uploadFile = multer({ storage: fileStorage });
+
+app.post('/upload/file', uploadFile.single('file'), (req, res) => {
   if (req.file) {
     res.json({
       fileUrl: `/uploads/${req.file.filename}`,
-      fileName: req.file.originalname,
-      mimeType: req.file.mimetype
+      fileName: req.file.originalname
     });
   } else {
     res.status(400).json({ error: 'No file uploaded' });
   }
 });
 
+// === SOCKET.IO EVENTS ===
 io.on('connection', socket => {
   let userName = '';
 
@@ -58,8 +81,12 @@ io.on('connection', socket => {
     io.emit('chat message', data);
   });
 
-  socket.on('chat file', data => {
-    io.emit('chat file', data);
+  socket.on('chat image', data => {
+    io.emit('chat image', data);
+  });
+
+  socket.on('file message', data => {
+    io.emit('file message', data);
   });
 
   socket.on('typing', name => {
@@ -68,10 +95,6 @@ io.on('connection', socket => {
 
   socket.on('voice-stream', data => {
     socket.broadcast.emit('voice-stream', data);
-  });
-
-  socket.on('message reaction', data => {
-    io.emit('message reaction', data);
   });
 
   socket.on('disconnect', () => {
@@ -83,5 +106,6 @@ io.on('connection', socket => {
   });
 });
 
+// Start the server
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
