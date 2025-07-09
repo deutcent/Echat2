@@ -99,8 +99,7 @@
       border: 1px solid #ccc;
     }
 
-    #image-input,
-    #file-input {
+    #image-input, #file-input {
       display: none;
     }
 
@@ -144,9 +143,9 @@
     <div id="user-list">Users:</div>
     <div id="messages"></div>
     <form id="form">
-      <label for="image-input" id="image-input-label">📷</label>
+      <label id="image-input-label" for="image-input">📷</label>
       <input type="file" id="image-input" accept="image/*" />
-      <label for="file-input" id="file-input-label">📁</label>
+      <label id="file-input-label" for="file-input">📎</label>
       <input type="file" id="file-input" />
       <button type="button" id="voice-btn">🎤</button>
       <input id="input" autocomplete="off" placeholder="Type a message..." required />
@@ -161,7 +160,6 @@
     while (!name) {
       name = prompt("Enter your name:");
     }
-
     socket.emit('user joined', name);
 
     const form = document.getElementById('form');
@@ -192,8 +190,7 @@
     function appendFileMessage(data, isSender = false) {
       const msg = document.createElement('div');
       msg.className = 'message ' + (isSender ? 'sender' : 'receiver');
-      msg.innerHTML = `<span class="username">${data.name}</span>
-        <a href="${data.fileUrl}" download="${data.fileName}" target="_blank">📄 ${data.fileName}</a>`;
+      msg.innerHTML = `<span class="username">${data.name}</span><a href="${data.fileUrl}" download="${data.fileName}" style="color: #075e54;">📎 ${data.fileName} (Click to Download)</a>`;
       messages.appendChild(msg);
       messages.scrollTop = messages.scrollHeight;
     }
@@ -220,18 +217,18 @@
       const file = imageInput.files[0];
       if (file) {
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('file', file);
         fetch('/upload', {
           method: 'POST',
           body: formData,
         })
-          .then(res => res.json())
-          .then(data => {
-            const msg = { name, imageUrl: data.imageUrl };
-            socket.emit('chat image', msg);
-            appendImageMessage(msg, true);
-          })
-          .catch(() => alert("Upload failed"));
+        .then(res => res.json())
+        .then(data => {
+          const msg = { name, imageUrl: data.fileUrl };
+          socket.emit('chat image', msg);
+          appendImageMessage(msg, true);
+        })
+        .catch(() => alert("Upload failed"));
       }
     });
 
@@ -240,17 +237,22 @@
       if (file) {
         const formData = new FormData();
         formData.append('file', file);
-        fetch('/upload/file', {
+        fetch('/upload', {
           method: 'POST',
           body: formData,
         })
         .then(res => res.json())
         .then(data => {
-          const msg = { name, fileUrl: data.fileUrl, fileName: data.fileName };
-          socket.emit('file message', msg);
+          const msg = {
+            name,
+            fileUrl: data.fileUrl,
+            fileName: data.fileName,
+            type: 'file'
+          };
+          socket.emit('chat message', msg);
           appendFileMessage(msg, true);
         })
-        .catch(() => alert("File upload failed"));
+        .catch(() => alert("Upload failed"));
       }
     });
 
@@ -259,15 +261,17 @@
     });
 
     socket.on('chat message', data => {
-      if (data.name !== name) appendMessage(data, false);
+      if (data.name !== name) {
+        if (data.type === 'file') {
+          appendFileMessage(data, false);
+        } else {
+          appendMessage(data, false);
+        }
+      }
     });
 
     socket.on('chat image', data => {
       if (data.name !== name) appendImageMessage(data, false);
-    });
-
-    socket.on('file message', data => {
-      if (data.name !== name) appendFileMessage(data, false);
     });
 
     socket.on('user joined', user => {
