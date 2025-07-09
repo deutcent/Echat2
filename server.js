@@ -14,39 +14,34 @@ let onlineUsers = new Map();
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// File upload storage setup
+// File Upload Setup
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, 'uploads');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname);
+    const uniquePrefix = Date.now() + '-';
+    cb(null, uniquePrefix + file.originalname);
   }
 });
 
-const upload = multer({ storage });
-
-// Handle image upload
-app.post('/upload', upload.single('image'), (req, res) => {
-  if (req.file) {
-    res.json({ imageUrl: `/uploads/${req.file.filename}` });
-  } else {
-    res.status(400).json({ error: 'No image uploaded' });
-  }
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB file size limit
 });
 
-// Handle generic file upload
-app.post('/upload-file', upload.single('file'), (req, res) => {
+app.post('/upload', upload.single('file'), (req, res) => {
   if (req.file) {
-    res.json({ fileUrl: `/uploads/${req.file.filename}` });
+    res.json({ 
+      fileUrl: `/uploads/${req.file.filename}`
+    });
   } else {
     res.status(400).json({ error: 'No file uploaded' });
   }
 });
 
-// Socket.IO events
 io.on('connection', socket => {
   let userName = '';
 
@@ -69,7 +64,7 @@ io.on('connection', socket => {
   socket.on('chat image', data => {
     io.emit('chat image', data);
   });
-
+  
   socket.on('chat file', data => {
     io.emit('chat file', data);
   });

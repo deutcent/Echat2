@@ -99,12 +99,10 @@
       border: 1px solid #ccc;
     }
 
-    #image-input,
     #file-input {
       display: none;
     }
 
-    #image-input-label,
     #file-input-label,
     #voice-btn,
     button[type='submit'] {
@@ -134,15 +132,49 @@
       margin-top: 5px;
     }
 
-    .download-link {
-      display: inline-block;
+    .file-message {
+      background: #f1f1f1;
+      padding: 10px;
+      border-radius: 5px;
       margin-top: 5px;
-      color: #075e54;
-      text-decoration: none;
-      font-weight: bold;
+      display: flex;
+      align-items: center;
     }
-    .download-link:hover {
-      text-decoration: underline;
+    
+    .file-icon {
+      font-size: 24px;
+      margin-right: 10px;
+    }
+    
+    .file-info {
+      flex: 1;
+    }
+    
+    .file-name {
+      font-weight: bold;
+      display: block;
+    }
+    
+    .file-size {
+      font-size: 0.8em;
+      color: #666;
+    }
+    
+    .download-btn {
+      background: #25D366;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 0.8em;
+    }
+    
+    .chat-video {
+      max-width: 100%;
+      max-height: 300px;
+      border-radius: 10px;
+      margin-top: 5px;
     }
   </style>
 </head>
@@ -155,10 +187,8 @@
     <div id="user-list">Users:</div>
     <div id="messages"></div>
     <form id="form">
-      <label id="image-input-label" for="image-input">📷</label>
-      <input type="file" id="image-input" accept="image/*" />
       <label id="file-input-label" for="file-input">📁</label>
-      <input type="file" id="file-input" />
+      <input type="file" id="file-input" accept="*" />
       <button type="button" id="voice-btn">🎤</button>
       <input id="input" autocomplete="off" placeholder="Type a message..." required />
       <button type="submit">➤</button>
@@ -180,7 +210,6 @@
     const messages = document.getElementById('messages');
     const onlineCount = document.getElementById('online-count');
     const userList = document.getElementById('user-list');
-    const imageInput = document.getElementById('image-input');
     const fileInput = document.getElementById('file-input');
     const voiceBtn = document.getElementById('voice-btn');
 
@@ -199,17 +228,59 @@
       messages.appendChild(msg);
       messages.scrollTop = messages.scrollHeight;
     }
-
+    
     function appendFileMessage(data, isSender = false) {
       const msg = document.createElement('div');
       msg.className = 'message ' + (isSender ? 'sender' : 'receiver');
-      msg.innerHTML = `
-        <span class="username">${data.name}</span>
-        <div><strong>${data.fileName}</strong></div>
-        <a href="${data.fileUrl}" download class="download-link">⬇️ Download</a>
+      
+      let content = `<span class="username">${data.name}</span>`;
+      
+      if (data.fileType.startsWith('image/')) {
+        content += `<img class="chat-image" src="${data.fileUrl}" alt="Image" />`;
+      } 
+      else if (data.fileType.startsWith('video/')) {
+        content += `
+          <video class="chat-video" controls>
+            <source src="${data.fileUrl}" type="${data.fileType}">
+            Your browser does not support the video tag.
+          </video>
+        `;
+      }
+      
+      content += `
+        <div class="file-message">
+          <div class="file-icon">${getFileIcon(data.fileType)}</div>
+          <div class="file-info">
+            <span class="file-name">${data.fileName}</span>
+            <span class="file-size">${data.fileSize}</span>
+          </div>
+          <a href="${data.fileUrl}" download="${data.fileName}">
+            <button class="download-btn">Download</button>
+          </a>
+        </div>
       `;
+      
+      msg.innerHTML = content;
       messages.appendChild(msg);
       messages.scrollTop = messages.scrollHeight;
+    }
+    
+    function getFileIcon(fileType) {
+      if (fileType.startsWith('image/')) return '🖼️';
+      if (fileType.startsWith('video/')) return '🎬';
+      if (fileType.startsWith('audio/')) return '🎵';
+      if (fileType === 'application/pdf') return '📄';
+      if (fileType.includes('word')) return '📝';
+      if (fileType.includes('excel')) return '📊';
+      if (fileType.includes('powerpoint')) return '📑';
+      if (fileType.includes('zip')) return '📦';
+      return '📁';
+    }
+    
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' bytes';
+      else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      else return (bytes / 1048576).toFixed(1) + ' MB';
     }
 
     function appendSystemMessage(text) {
@@ -230,35 +301,28 @@
       }
     });
 
-    imageInput.addEventListener('change', () => {
-      const file = imageInput.files[0];
-      if (file) {
-        const formData = new FormData();
-        formData.append('image', file);
-        fetch('/upload', { method: 'POST', body: formData })
-          .then(res => res.json())
-          .then(data => {
-            const msg = { name, imageUrl: data.imageUrl };
-            socket.emit('chat image', msg);
-            appendImageMessage(msg, true);
-          })
-          .catch(() => alert("Upload failed"));
-      }
-    });
-
     fileInput.addEventListener('change', () => {
       const file = fileInput.files[0];
       if (file) {
         const formData = new FormData();
         formData.append('file', file);
-        fetch('/upload-file', { method: 'POST', body: formData })
+        fetch('/upload', {
+          method: 'POST',
+          body: formData,
+        })
           .then(res => res.json())
           .then(data => {
-            const msg = { name, fileName: file.name, fileUrl: data.fileUrl };
+            const msg = { 
+              name, 
+              fileUrl: data.fileUrl, 
+              fileName: file.name, 
+              fileType: file.type,
+              fileSize: formatFileSize(file.size)
+            };
             socket.emit('chat file', msg);
             appendFileMessage(msg, true);
           })
-          .catch(() => alert("File upload failed"));
+          .catch(() => alert("Upload failed"));
       }
     });
 
@@ -266,27 +330,122 @@
       socket.emit('typing', name);
     });
 
-    socket.on('chat message', data => { if (data.name !== name) appendMessage(data, false); });
-    socket.on('chat image', data => { if (data.name !== name) appendImageMessage(data, false); });
-    socket.on('chat file', data => { if (data.name !== name) appendFileMessage(data, false); });
+    socket.on('chat message', data => {
+      if (data.name !== name) appendMessage(data, false);
+    });
 
-    socket.on('user joined', user => appendSystemMessage(`${user} joined the chat`));
-    socket.on('user left', user => appendSystemMessage(`${user} left the chat`));
+    socket.on('chat image', data => {
+      if (data.name !== name) appendImageMessage(data, false);
+    });
+    
+    socket.on('chat file', data => {
+      if (data.name !== name) appendFileMessage(data, false);
+    });
+
+    socket.on('user joined', user => {
+      appendSystemMessage(`${user} joined the chat`);
+    });
+
+    socket.on('user left', user => {
+      appendSystemMessage(`${user} left the chat`);
+    });
 
     socket.on('typing', user => {
       if (user !== name) {
         userList.innerText = `${user} is typing...`;
         clearTimeout(window.typingTimeout);
-        window.typingTimeout = setTimeout(() => userList.innerText = '', 2000);
+        window.typingTimeout = setTimeout(() => {
+          userList.innerText = '';
+        }, 2000);
       }
     });
 
     socket.on('online users', data => {
       onlineCount.innerText = `Online: ${data.count}`;
-      if (!window.typingTimeout) userList.innerText = `Users: ${data.users.join(', ')}`;
+      if (!window.typingTimeout) {
+        userList.innerText = `Users: ${data.users.join(', ')}`;
+      }
     });
 
-    // voice streaming code stays the same...
+    // === Voice Streaming ===
+    let audioContext, mediaStream, source, processor;
+    let isStreaming = false;
+
+    function convertFloat32ToInt16(buffer) {
+      const int16 = new Int16Array(buffer.length);
+      for (let i = 0; i < buffer.length; i++) {
+        int16[i] = Math.min(1, buffer[i]) * 0x7FFF;
+      }
+      return Array.from(int16);
+    }
+
+    function startStreaming() {
+      if (isStreaming) return;
+      isStreaming = true;
+
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        mediaStream = stream;
+        source = audioContext.createMediaStreamSource(stream);
+        processor = audioContext.createScriptProcessor(2048, 1, 1);
+
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+
+        processor.onaudioprocess = e => {
+          if (!isStreaming) return;
+          const input = e.inputBuffer.getChannelData(0);
+          const int16Data = convertFloat32ToInt16(input);
+          socket.emit('voice-stream', int16Data);
+        };
+
+        voiceBtn.classList.add('speaking');
+      }).catch(() => {
+        alert("Microphone access denied");
+        isStreaming = false;
+      });
+    }
+
+    function stopStreaming() {
+      isStreaming = false;
+      if (processor) {
+        processor.disconnect();
+        processor.onaudioprocess = null;
+        processor = null;
+      }
+      if (source) source.disconnect();
+      if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+      if (audioContext) audioContext.close();
+
+      processor = null;
+      source = null;
+      mediaStream = null;
+      audioContext = null;
+
+      voiceBtn.classList.remove('speaking');
+    }
+
+    voiceBtn.addEventListener('mousedown', startStreaming);
+    voiceBtn.addEventListener('mouseup', stopStreaming);
+    voiceBtn.addEventListener('touchstart', e => { e.preventDefault(); startStreaming(); });
+    voiceBtn.addEventListener('touchend', e => { e.preventDefault(); stopStreaming(); });
+
+    const playbackContext = new (window.AudioContext || window.webkitAudioContext)();
+    socket.on('voice-stream', data => {
+      const int16 = new Int16Array(data);
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / 0x7FFF;
+      }
+
+      const buffer = playbackContext.createBuffer(1, float32.length, 44100);
+      buffer.copyToChannel(float32, 0);
+
+      const src = playbackContext.createBufferSource();
+      src.buffer = buffer;
+      src.connect(playbackContext.destination);
+      src.start();
+    });
   </script>
 </body>
 </html>
