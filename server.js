@@ -14,7 +14,7 @@ let onlineUsers = new Map();
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// File upload storage setup
+// File Upload Setup
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, 'uploads');
@@ -25,10 +25,8 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + '-' + file.originalname);
   }
 });
-
 const upload = multer({ storage });
 
-// Handle image upload
 app.post('/upload', upload.single('image'), (req, res) => {
   if (req.file) {
     res.json({ imageUrl: `/uploads/${req.file.filename}` });
@@ -37,7 +35,6 @@ app.post('/upload', upload.single('image'), (req, res) => {
   }
 });
 
-// Handle generic file upload
 app.post('/upload-file', upload.single('file'), (req, res) => {
   if (req.file) {
     res.json({ fileUrl: `/uploads/${req.file.filename}` });
@@ -46,7 +43,6 @@ app.post('/upload-file', upload.single('file'), (req, res) => {
   }
 });
 
-// Socket.IO events
 io.on('connection', socket => {
   let userName = '';
 

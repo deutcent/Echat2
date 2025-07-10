@@ -1,6 +1,7 @@
-/uploads
+# Ignore uploads and large files
+uploads/
 *.mp4
-*.mov
 *.zip
 *.exe
-*.pdf
+*.avi
+*.mkv
