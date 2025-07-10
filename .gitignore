@@ -1,7 +1,9 @@
-# Ignore uploads and large files
 uploads/
 *.mp4
-*.zip
-*.exe
-*.avi
 *.mkv
+*.avi
+*.mov
+*.mp3
+*.wav
+*.ogg
+*.flac
