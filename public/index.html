@@ -56,6 +56,7 @@
       clear: both;
       display: inline-block;
       word-wrap: break-word;
+      position: relative;
     }
 
     .sender {
@@ -81,6 +82,47 @@
       color: #666;
       font-size: 0.8rem;
       margin: 10px 0;
+    }
+
+    .msg-options {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      cursor: pointer;
+    }
+
+    .msg-menu {
+      position: absolute;
+      top: 20px;
+      right: 5px;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      display: none;
+      z-index: 10;
+    }
+
+    .msg-menu button {
+      padding: 5px 10px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+    }
+
+    .msg-menu button:hover {
+      background: #eee;
+    }
+
+    .reactions {
+      margin-top: 5px;
+    }
+
+    .reaction {
+      display: inline-block;
+      font-size: 18px;
+      margin-right: 5px;
     }
 
     #form {
@@ -154,7 +196,7 @@
     <div id="messages"></div>
     <form id="form">
       <label id="file-input-label" for="file-input">📎</label>
-      <input type="file" id="file-input" accept="image/*,.pdf,.doc,.docx,.txt" />
+      <input type="file" id="file-input" accept="image/*,.pdf,.doc,.docx,.txt,.mp4" />
       <button type="button" id="voice-btn">🎤</button>
       <input id="input" autocomplete="off" placeholder="Type a message..." required />
       <button type="submit">➤</button>
@@ -165,9 +207,7 @@
   <script>
     const socket = io();
     let name = '';
-    while (!name) {
-      name = prompt("Enter your name:");
-    }
+    while (!name) name = prompt("Enter your name:");
 
     socket.emit('user joined', name);
 
@@ -179,44 +219,54 @@
     const fileInput = document.getElementById('file-input');
     const voiceBtn = document.getElementById('voice-btn');
 
-    function appendMessage(data, isSender = false) {
+    function createMessageElement(data, isSender = false) {
       const msg = document.createElement('div');
       msg.className = 'message ' + (isSender ? 'sender' : 'receiver');
-      msg.innerHTML = `<span class="username">${data.name}</span>${data.message}`;
-      messages.appendChild(msg);
-      messages.scrollTop = messages.scrollHeight;
-    }
+      msg.dataset.id = data.id;
 
-    function appendImageMessage(data, isSender = false) {
-      const msg = document.createElement('div');
-      msg.className = 'message ' + (isSender ? 'sender' : 'receiver');
-      msg.innerHTML = `<span class="username">${data.name}</span><img class="chat-image" src="${data.url}" alt="Image" />`;
-      messages.appendChild(msg);
-      messages.scrollTop = messages.scrollHeight;
-    }
+      let content = `<span class="username">${data.name}</span>${data.message || ''}`;
+      if (data.type === 'image') {
+        content += `<br><img class="chat-image" src="${data.url}" alt="Image" />`;
+        content += `<br><a class="download-link" href="${data.url}" download>⬇️ Download Image</a>`;
+      } else if (data.type === 'file') {
+        content += `<div>📄 ${data.filename}</div><a class="download-link" href="${data.url}" download>⬇️ Download</a>`;
+      }
 
-    function appendDocumentMessage(data, isSender = false) {
-      const msg = document.createElement('div');
-      msg.className = 'message ' + (isSender ? 'sender' : 'receiver');
-      msg.innerHTML = `<span class="username">${data.name}</span><div>📄 ${data.filename}</div><a class="download-link" href="${data.url}" download>⬇️ Download</a>`;
-      messages.appendChild(msg);
-      messages.scrollTop = messages.scrollHeight;
-    }
+      if (isSender) {
+        content += `
+          <div class="msg-options">⋮</div>
+          <div class="msg-menu">
+            <button onclick="deleteMessage('${data.id}')">🗑️ Delete</button>
+            <button onclick="reactToMessage('${data.id}', '❤️')">❤️</button>
+            <button onclick="reactToMessage('${data.id}', '😂')">😂</button>
+            <button onclick="reactToMessage('${data.id}', '👍')">👍</button>
+          </div>`;
+      }
 
-    function appendSystemMessage(text) {
-      const msg = document.createElement('div');
-      msg.className = 'system';
-      msg.innerText = text;
+      if (data.reactions) {
+        const reactions = Object.values(data.reactions).map(r => `<span class="reaction">${r}</span>`).join('');
+        content += `<div class="reactions">${reactions}</div>`;
+      }
+
+      msg.innerHTML = content;
       messages.appendChild(msg);
       messages.scrollTop = messages.scrollHeight;
+
+      msg.querySelector?.('.msg-options')?.addEventListener('click', () => {
+        msg.querySelector('.msg-menu').style.display = 'block';
+        setTimeout(() => {
+          window.addEventListener('click', () => msg.querySelector('.msg-menu').style.display = 'none', { once: true });
+        });
+      });
     }
 
     form.addEventListener('submit', e => {
       e.preventDefault();
       if (input.value) {
-        const msg = { name, message: input.value };
+        const id = Date.now().toString();
+        const msg = { id, name, message: input.value };
         socket.emit('chat message', msg);
-        appendMessage(msg, true);
+        createMessageElement(msg, true);
         input.value = '';
       }
     });
@@ -230,18 +280,20 @@
           method: 'POST',
           body: formData,
         })
-          .then(res => res.json())
-          .then(data => {
-            const payload = { name, url: data.fileUrl, filename: file.name };
-            if (file.type.startsWith('image/')) {
-              socket.emit('chat image', payload);
-              appendImageMessage(payload, true);
-            } else {
-              socket.emit('chat file', payload);
-              appendDocumentMessage(payload, true);
-            }
-          })
-          .catch(() => alert("Upload failed"));
+        .then(res => res.json())
+        .then(data => {
+          const id = Date.now().toString();
+          const payload = { id, name, url: data.fileUrl, filename: file.name };
+          if (file.type.startsWith('image/')) {
+            payload.type = 'image';
+            socket.emit('chat image', payload);
+            createMessageElement(payload, true);
+          } else {
+            payload.type = 'file';
+            socket.emit('chat file', payload);
+            createMessageElement(payload, true);
+          }
+        });
       }
     });
 
@@ -249,24 +301,57 @@
       socket.emit('typing', name);
     });
 
+    function deleteMessage(id) {
+      socket.emit('delete message', id);
+      document.querySelector(`[data-id="${id}"]`)?.remove();
+    }
+
+    function reactToMessage(id, emoji) {
+      socket.emit('react message', { id, emoji, name });
+    }
+
     socket.on('chat message', data => {
-      if (data.name !== name) appendMessage(data, false);
+      if (data.name !== name) createMessageElement(data, false);
     });
 
     socket.on('chat image', data => {
-      if (data.name !== name) appendImageMessage(data, false);
+      if (data.name !== name) createMessageElement(data, false);
     });
 
     socket.on('chat file', data => {
-      if (data.name !== name) appendDocumentMessage(data, false);
+      if (data.name !== name) createMessageElement(data, false);
+    });
+
+    socket.on('delete message', id => {
+      document.querySelector(`[data-id="${id}"]`)?.remove();
+    });
+
+    socket.on('react message', ({ id, reactions }) => {
+      const msg = document.querySelector(`[data-id="${id}"]`);
+      if (msg) {
+        const reactionHTML = Object.values(reactions).map(r => `<span class="reaction">${r}</span>`).join('');
+        let rDiv = msg.querySelector('.reactions');
+        if (!rDiv) {
+          rDiv = document.createElement('div');
+          rDiv.className = 'reactions';
+          msg.appendChild(rDiv);
+        }
+        rDiv.innerHTML = reactionHTML;
+      }
     });
 
     socket.on('user joined', user => {
-      appendSystemMessage(`${user} joined the chat`);
+      const sys = document.createElement('div');
+      sys.className = 'system';
+      sys.innerText = `${user} joined the chat`;
+      messages.appendChild(sys);
     });
 
     socket.on('user left', user => {
-      appendSystemMessage(`${user} left the chat`);
+      const sys = document.createElement('div');
+      sys.className = 'system';
+      sys.innerText = `${user} left the chat`;
+      messages.appendChild(sys);
     });
 
     socket.on('typing', user => {
@@ -301,23 +386,19 @@
     function startStreaming() {
       if (isStreaming) return;
       isStreaming = true;
-
       navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         mediaStream = stream;
         source = audioContext.createMediaStreamSource(stream);
         processor = audioContext.createScriptProcessor(2048, 1, 1);
-
         source.connect(processor);
         processor.connect(audioContext.destination);
-
         processor.onaudioprocess = e => {
           if (!isStreaming) return;
           const input = e.inputBuffer.getChannelData(0);
           const int16Data = convertFloat32ToInt16(input);
           socket.emit('voice-stream', int16Data);
         };
-
         voiceBtn.classList.add('speaking');
       }).catch(() => {
         alert("Microphone access denied");
@@ -335,12 +416,10 @@
       if (source) source.disconnect();
       if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
       if (audioContext) audioContext.close();
-
       processor = null;
       source = null;
       mediaStream = null;
       audioContext = null;
-
       voiceBtn.classList.remove('speaking');
     }
 
@@ -356,10 +435,8 @@
       for (let i = 0; i < int16.length; i++) {
         float32[i] = int16[i] / 0x7FFF;
       }
-
       const buffer = playbackContext.createBuffer(1, float32.length, 44100);
       buffer.copyToChannel(float32, 0);
-
       const src = playbackContext.createBufferSource();
       src.buffer = buffer;
       src.connect(playbackContext.destination);
