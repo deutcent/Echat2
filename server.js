@@ -76,12 +76,17 @@ io.on('connection', socket => {
     socket.broadcast.emit('voice-stream', data);
   });
 
-  // === NEW: Delete Message ===
+  // === Clear All Chat ===
+  socket.on('clear all chat', () => {
+    io.emit('clear all chat');
+  });
+
+  // === Delete Message ===
   socket.on('delete message', messageId => {
     io.emit('delete message', messageId);
   });
 
-  // === NEW: React to Message ===
+  // === React to Message ===
   socket.on('react message', ({ id, emoji, name }) => {
     if (!messageReactions.has(id)) {
       messageReactions.set(id, {});
