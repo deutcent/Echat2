@@ -325,8 +325,14 @@
     function reactToMessage(id, emoji) {
       socket.emit('react message', { id, emoji, name });
     }
+socket.on('previous messages', data => {
+  data.forEach(msg => {
+    createMessageElement(msg, msg.name === name);
+  });
+});
 
     socket.on('chat message', data => {
+      
       if (data.name !== name) createMessageElement(data, false);
     });
 

@@ -4,18 +4,37 @@ const socketIo = require('socket.io');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const mongoose = require('mongoose');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
+// === MongoDB Connection ===
+mongoose.connect('mongodb+srv://swatantrakumar1582011:EcaewvoJs0wWpHRn@cluster0.x90rnfu.mongodb.net/Echat?retryWrites=true&w=majority&appName=Cluster0')
+  .then(() => console.log('✅ MongoDB Connected'))
+  .catch(err => console.error(err));
+
+const messageSchema = new mongoose.Schema({
+  id: String,
+  name: String,
+  message: String,
+  url: String,
+  filename: String,
+  type: String,
+  reactions: Object,
+  timestamp: { type: Date, default: Date.now }
+});
+const Message = mongoose.model('Message', messageSchema);
+
+// === Online Users & Reactions ===
 let onlineUsers = new Map();
-let messageReactions = new Map(); // key: message ID, value: { user: emoji }
+let messageReactions = new Map();
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// === File Upload Configuration ===
+// === File Upload ===
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, 'uploads');
@@ -36,6 +55,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
   }
 });
 
+// === Socket.IO Logic ===
 io.on('connection', socket => {
   let userName = '';
 
@@ -44,6 +64,11 @@ io.on('connection', socket => {
     io.emit('online users', { count: users.length, users });
   };
 
+  // Send previous messages
+  Message.find().sort({ timestamp: 1 }).then(messages => {
+    socket.emit('previous messages', messages);
+  });
+
   socket.on('user joined', name => {
     userName = name;
     onlineUsers.set(socket.id, name);
@@ -51,20 +76,24 @@ io.on('connection', socket => {
     broadcastUsers();
   });
 
-  socket.on('chat message', data => {
-    data.reactions = messageReactions.get(data.id) || {};
+  socket.on('chat message', async (data) => {
+    data.reactions = {};
+    const msg = new Message(data);
+    await msg.save();
     io.emit('chat message', data);
   });
 
-  socket.on('chat image', data => {
-    data.type = 'image';
-    data.reactions = messageReactions.get(data.id) || {};
+  socket.on('chat image', async (data) => {
+    data.reactions = {};
+    const msg = new Message(data);
+    await msg.save();
     io.emit('chat image', data);
   });
 
-  socket.on('chat file', data => {
-    data.type = 'file';
-    data.reactions = messageReactions.get(data.id) || {};
+  socket.on('chat file', async (data) => {
+    data.reactions = {};
+    const msg = new Message(data);
+    await msg.save();
     io.emit('chat file', data);
   });
 
@@ -76,24 +105,25 @@ io.on('connection', socket => {
     socket.broadcast.emit('voice-stream', data);
   });
 
-  // === Clear All Chat ===
-  socket.on('clear all chat', () => {
+  socket.on('clear all chat', async () => {
+    await Message.deleteMany({});
     io.emit('clear all chat');
   });
 
-  // === Delete Message ===
-  socket.on('delete message', messageId => {
-    io.emit('delete message', messageId);
+  socket.on('delete message', async (id) => {
+    await Message.deleteOne({ id });
+    io.emit('delete message', id);
   });
 
-  // === React to Message ===
-  socket.on('react message', ({ id, emoji, name }) => {
+  socket.on('react message', async ({ id, emoji, name }) => {
     if (!messageReactions.has(id)) {
       messageReactions.set(id, {});
     }
     const reactions = messageReactions.get(id);
     reactions[name] = emoji;
     messageReactions.set(id, reactions);
+
+    await Message.updateOne({ id }, { $set: { reactions } });
     io.emit('react message', { id, reactions });
   });
 
