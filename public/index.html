@@ -207,7 +207,7 @@
     <div id="messages"></div>
     <form id="form">
       <label id="file-input-label" for="file-input">📎</label>
-      <input type="file" id="file-input" accept="image/*,.pdf,.doc,.docx,.txt,.mp4" />
+      <input type="file" id="file-input" accept="image/*,.gif,.pdf,.doc,.docx,.txt,.mp4" />
       <button type="button" id="voice-btn">🎤</button>
       <input id="input" autocomplete="off" placeholder="Type a message..." required />
       <button type="submit">➤</button>
@@ -271,10 +271,60 @@
       msg.querySelector?.('.msg-options')?.addEventListener('click', () => {
         msg.querySelector('.msg-menu').style.display = 'block';
         setTimeout(() => {
-          window.addEventListener('click', () => msg.querySelector('.msg-menu').style.display = 'none', { once: true });
+          window.addEventListener('click', () => {
+            if(msg.querySelector('.msg-menu')) msg.querySelector('.msg-menu').style.display = 'none';
+          }, { once: true });
         });
       });
     }
+
+    // --- NEW: Upload file (image/gif or other) helper function ---
+    function uploadFile(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      fetch('/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      .then(res => res.json())
+      .then(data => {
+        const id = Date.now().toString();
+        const payload = { id, name, url: data.fileUrl, filename: file.name };
+        if (file.type.startsWith('image/')) {
+          payload.type = 'image'; // Supports gif & other images
+          socket.emit('chat image', payload);
+          createMessageElement(payload, true);
+        } else {
+          payload.type = 'file';
+          socket.emit('chat file', payload);
+          createMessageElement(payload, true);
+        }
+      })
+      .catch(() => alert('Upload failed'));
+    }
+
+    // --- UPDATED: Handle paste to allow sending copied images/gifs from clipboard ---
+    input.addEventListener('paste', async (event) => {
+      const items = (event.clipboardData || event.originalEvent?.clipboardData)?.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            event.preventDefault(); // prevent raw pasting
+            uploadFile(file);
+          }
+        }
+      }
+    });
+
+    // --- UPDATED: File input change uses uploadFile helper ---
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (file) uploadFile(file);
+    });
 
     form.addEventListener('submit', e => {
       e.preventDefault();
@@ -284,32 +334,6 @@
         socket.emit('chat message', msg);
         createMessageElement(msg, true);
         input.value = '';
-      }
-    });
-
-    fileInput.addEventListener('change', () => {
-      const file = fileInput.files[0];
-      if (file) {
-        const formData = new FormData();
-        formData.append('file', file);
-        fetch('/upload', {
-          method: 'POST',
-          body: formData,
-        })
-        .then(res => res.json())
-        .then(data => {
-          const id = Date.now().toString();
-          const payload = { id, name, url: data.fileUrl, filename: file.name };
-          if (file.type.startsWith('image/')) {
-            payload.type = 'image';
-            socket.emit('chat image', payload);
-            createMessageElement(payload, true);
-          } else {
-            payload.type = 'file';
-            socket.emit('chat file', payload);
-            createMessageElement(payload, true);
-          }
-        });
       }
     });
 
@@ -325,14 +349,14 @@
     function reactToMessage(id, emoji) {
       socket.emit('react message', { id, emoji, name });
     }
-socket.on('previous messages', data => {
-  data.forEach(msg => {
-    createMessageElement(msg, msg.name === name);
-  });
-});
+
+    socket.on('previous messages', data => {
+      data.forEach(msg => {
+        createMessageElement(msg, msg.name === name);
+      });
+    });
 
     socket.on('chat message', data => {
-      
       if (data.name !== name) createMessageElement(data, false);
     });
 

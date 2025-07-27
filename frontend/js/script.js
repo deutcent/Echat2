@@ -1,0 +1,1 @@
+// Main chat functionality will be added here.

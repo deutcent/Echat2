@@ -34,7 +34,7 @@ let messageReactions = new Map();
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// === File Upload ===
+// === File Upload (accepts GIFs and images, files) ===
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, 'uploads');
@@ -64,7 +64,7 @@ io.on('connection', socket => {
     io.emit('online users', { count: users.length, users });
   };
 
-  // Send previous messages
+  // Send previous messages to newly connected socket
   Message.find().sort({ timestamp: 1 }).then(messages => {
     socket.emit('previous messages', messages);
   });
