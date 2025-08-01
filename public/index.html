@@ -57,17 +57,22 @@
       display: inline-block;
       word-wrap: break-word;
       position: relative;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      cursor: pointer;
+      user-select: none;
     }
 
     .sender {
       background: #dcf8c6;
       float: right;
       text-align: right;
+      border: 1px solid #c1e8b8;
     }
 
     .receiver {
       background: #fff;
       float: left;
+      border: 1px solid #e0e0e0;
     }
 
     .username {
@@ -75,6 +80,14 @@
       color: #075e54;
       display: block;
       margin-bottom: 2px;
+      font-size: 0.9em;
+    }
+
+    .timestamp {
+      font-size: 0.7em;
+      color: #666;
+      margin-top: 2px;
+      display: block;
     }
 
     .system {
@@ -84,45 +97,63 @@
       margin: 10px 0;
     }
 
-    .msg-options {
-      position: absolute;
-      top: 5px;
-      right: 5px;
-      cursor: pointer;
-    }
-
-    .msg-menu {
-      position: absolute;
-      top: 20px;
-      right: 5px;
-      background: white;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      display: none;
-      z-index: 10;
-    }
-
-    .msg-menu button {
-      padding: 5px 10px;
-      background: none;
-      border: none;
-      cursor: pointer;
-      width: 100%;
-      text-align: left;
-    }
-
-    .msg-menu button:hover {
-      background: #eee;
-    }
-
     .reactions {
       margin-top: 5px;
+      text-align: left;
     }
 
     .reaction {
       display: inline-block;
-      font-size: 18px;
+      font-size: 16px;
       margin-right: 5px;
+      padding: 2px 4px;
+      background: rgba(255,255,255,0.8);
+      border-radius: 12px;
+      border: 1px solid #ddd;
+    }
+
+    /* === Context Palette === */
+    .palette {
+      position: fixed;
+      z-index: 1000;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 12px;
+      display: flex;
+      gap: 8px;
+      padding: 8px 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    .palette button {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      transition: transform 0.15s;
+      animation: bounce 0.3s ease-out;
+    }
+
+    .palette button:hover {
+      transform: scale(1.3);
+    }
+
+    .palette .delete-btn {
+      font-size: 18px;
+      color: #d00;
+      margin-left: 6px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.8); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes bounce {
+      0% { transform: scale(0.6); }
+      80% { transform: scale(1.2); }
+      100% { transform: scale(1); }
     }
 
     #form {
@@ -155,6 +186,13 @@
       border-radius: 50%;
       font-size: 16px;
       cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    #file-input-label:hover,
+    #voice-btn:hover,
+    button[type='submit']:hover {
+      background: #1ea952;
     }
 
     #voice-btn.speaking {
@@ -179,6 +217,7 @@
       margin-top: 5px;
       color: #007bff;
       text-decoration: none;
+      font-size: 0.85em;
     }
 
     a.download-link:hover {
@@ -193,6 +232,11 @@
       color: white;
       border-radius: 5px;
       cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    #clear-chat-btn:hover {
+      background: #cc0000;
     }
   </style>
 </head>
@@ -220,6 +264,7 @@
 
     let name = '';
     let password = '';
+    // Original password protection
     while (password !== 'stroracle') {
       password = prompt("Enter password to join:");
     }
@@ -235,32 +280,112 @@
     const fileInput = document.getElementById('file-input');
     const voiceBtn = document.getElementById('voice-btn');
 
+    // === Long Press / Right Click Palette ===
+    function createPalette(x, y, msgId, isSender) {
+      // Remove existing palettes
+      document.querySelectorAll('.palette').forEach(p => p.remove());
+      
+      const palette = document.createElement('div');
+      palette.className = 'palette';
+      
+      // Add emoji reactions
+      ['❤️', '😂', '👍', '😮', '😢'].forEach(emoji => {
+        const btn = document.createElement('button');
+        btn.textContent = emoji;
+        btn.style.animation = 'bounce 0.3s ease-out';
+        btn.onclick = () => {
+          socket.emit('react message', { id: msgId, emoji, name });
+          palette.remove();
+        };
+        palette.appendChild(btn);
+      });
+      
+      // Add delete button for sender only
+      if (isSender) {
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '🗑️';
+        delBtn.className = 'delete-btn';
+        delBtn.onclick = () => {
+          socket.emit('delete message', msgId);
+          palette.remove();
+        };
+        palette.appendChild(delBtn);
+      }
+      
+      // Position palette
+      palette.style.top = y + 'px';
+      palette.style.left = x + 'px';
+      document.body.appendChild(palette);
+      
+      // Close on outside click or ESC
+      const closeHandler = (ev) => {
+        if (!palette.contains(ev.target)) {
+          palette.remove();
+          document.removeEventListener('click', closeHandler);
+        }
+      };
+      setTimeout(() => document.addEventListener('click', closeHandler), 10);
+      
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') palette.remove();
+      }, { once: true });
+    }
+
+    function attachLongPressAndContext(msgElement, isSender) {
+      let pressTimer;
+      
+      const startPress = (e) => {
+        const touch = e.touches ? e.touches[0] : e;
+        pressTimer = setTimeout(() => {
+          createPalette(touch.clientX, touch.clientY, msgElement.dataset.id, isSender);
+        }, 500);
+      };
+      
+      const cancelPress = () => {
+        clearTimeout(pressTimer);
+      };
+      
+      // Touch events for mobile
+      msgElement.addEventListener('touchstart', startPress);
+      msgElement.addEventListener('touchend', cancelPress);
+      msgElement.addEventListener('touchmove', cancelPress);
+      
+      // Mouse events for desktop
+      msgElement.addEventListener('mousedown', startPress);
+      msgElement.addEventListener('mouseup', cancelPress);
+      msgElement.addEventListener('mouseleave', cancelPress);
+      
+      // Right-click context menu
+      msgElement.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        createPalette(e.clientX, e.clientY, msgElement.dataset.id, isSender);
+      });
+    }
+
     function createMessageElement(data, isSender = false) {
       const msg = document.createElement('div');
       msg.className = 'message ' + (isSender ? 'sender' : 'receiver');
       msg.dataset.id = data.id;
 
       let content = `<span class="username">${data.name}</span>${data.message || ''}`;
-      if (data.type === 'image') {
-        content += `<br><img class="chat-image" src="${data.url}" alt="Image" />`;
+      
+      // Handle images, GIFs, and files
+      if (data.type === 'image' || data.type === 'gif') {
+        content += `<br><img class="chat-image" src="${data.url}" alt="Image/GIF" />`;
         content += `<br><a class="download-link" href="${data.url}" download>⬇️ Download Image</a>`;
       } else if (data.type === 'file') {
         content += `<div>📄 ${data.filename}</div><a class="download-link" href="${data.url}" download>⬇️ Download</a>`;
       }
 
-      if (isSender) {
-        content += `
-          <div class="msg-options">⋮</div>
-          <div class="msg-menu">
-            <button onclick="deleteMessage('${data.id}')">🗑️ Delete</button>
-            <button onclick="reactToMessage('${data.id}', '❤️')">❤️</button>
-            <button onclick="reactToMessage('${data.id}', '😂')">😂</button>
-            <button onclick="reactToMessage('${data.id}', '👍')">👍</button>
-          </div>`;
-      }
+      // Add timestamp
+      const timestamp = new Date(data.timestamp || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      content += `<span class="timestamp">${timestamp}</span>`;
 
-      if (data.reactions) {
-        const reactions = Object.values(data.reactions).map(r => `<span class="reaction">${r}</span>`).join('');
+      // Reactions display
+      if (data.reactions && Object.keys(data.reactions).length > 0) {
+        const reactions = Object.entries(data.reactions)
+          .map(([user, emoji]) => `<span class="reaction" title="${user}">${emoji}</span>`)
+          .join('');
         content += `<div class="reactions">${reactions}</div>`;
       }
 
@@ -268,88 +393,84 @@
       messages.appendChild(msg);
       messages.scrollTop = messages.scrollHeight;
 
-      msg.querySelector?.('.msg-options')?.addEventListener('click', () => {
-        msg.querySelector('.msg-menu').style.display = 'block';
-        setTimeout(() => {
-          window.addEventListener('click', () => {
-            if(msg.querySelector('.msg-menu')) msg.querySelector('.msg-menu').style.display = 'none';
-          }, { once: true });
-        });
-      });
+      // Attach long press and context menu
+      attachLongPressAndContext(msg, isSender);
     }
 
-    // --- NEW: Upload file (image/gif or other) helper function ---
-    function uploadFile(file) {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      fetch('/upload', {
-        method: 'POST',
-        body: formData,
-      })
-      .then(res => res.json())
-      .then(data => {
-        const id = Date.now().toString();
-        const payload = { id, name, url: data.fileUrl, filename: file.name };
-        if (file.type.startsWith('image/')) {
-          payload.type = 'image'; // Supports gif & other images
-          socket.emit('chat image', payload);
-          createMessageElement(payload, true);
-        } else {
-          payload.type = 'file';
-          socket.emit('chat file', payload);
-          createMessageElement(payload, true);
-        }
-      })
-      .catch(() => alert('Upload failed'));
-    }
-
-    // --- UPDATED: Handle paste to allow sending copied images/gifs from clipboard ---
-    input.addEventListener('paste', async (event) => {
-      const items = (event.clipboardData || event.originalEvent?.clipboardData)?.items;
-      if (!items) return;
-
-      for (const item of items) {
-        if (item.type.startsWith('image/')) {
-          const file = item.getAsFile();
-          if (file) {
-            event.preventDefault(); // prevent raw pasting
-            uploadFile(file);
-          }
-        }
-      }
-    });
-
-    // --- UPDATED: File input change uses uploadFile helper ---
-    fileInput.addEventListener('change', () => {
-      const file = fileInput.files[0];
-      if (file) uploadFile(file);
-    });
-
+    // Text message submission
     form.addEventListener('submit', e => {
       e.preventDefault();
       if (input.value) {
         const id = Date.now().toString();
-        const msg = { id, name, message: input.value };
+        const msg = { id, name, message: input.value, timestamp: Date.now() };
         socket.emit('chat message', msg);
         createMessageElement(msg, true);
         input.value = '';
       }
     });
 
+    // File upload handling
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        fetch('/upload', {
+          method: 'POST',
+          body: formData,
+        })
+        .then(res => res.json())
+        .then(data => {
+          const id = Date.now().toString();
+          const payload = { id, name, url: data.fileUrl, filename: file.name, timestamp: Date.now() };
+          
+          if (file.type.startsWith('image/') || file.type === 'image/gif') {
+            payload.type = file.type === 'image/gif' ? 'gif' : 'image';
+            socket.emit('chat image', payload);
+            createMessageElement(payload, true);
+          } else {
+            payload.type = 'file';
+            socket.emit('chat file', payload);
+            createMessageElement(payload, true);
+          }
+        });
+        fileInput.value = '';
+      }
+    });
+
+    // Clipboard paste functionality for images and GIFs
+    document.addEventListener('paste', async (e) => {
+      const items = e.clipboardData?.items || [];
+      const imageItem = [...items].find(item => item.type.startsWith('image/'));
+      
+      if (!imageItem) return;
+      e.preventDefault();
+
+      const blob = imageItem.getAsFile();
+      const formData = new FormData();
+      formData.append('file', blob, 'pasted-image');
+      
+      const res = await fetch('/upload', { method: 'POST', body: formData });
+      const { fileUrl } = await res.json();
+      
+      const id = Date.now().toString();
+      const payload = {
+        id, name, url: fileUrl,
+        type: blob.type === 'image/gif' ? 'gif' : 'image',
+        filename: 'pasted-image',
+        timestamp: Date.now()
+      };
+      
+      socket.emit('chat image', payload);
+      createMessageElement(payload, true);
+    });
+
+    // Typing indicator
     input.addEventListener('input', () => {
       socket.emit('typing', name);
     });
 
-    function deleteMessage(id) {
-      socket.emit('delete message', id);
-      document.querySelector(`[data-id="${id}"]`)?.remove();
-    }
-
-    function reactToMessage(id, emoji) {
-      socket.emit('react message', { id, emoji, name });
-    }
-
+    // Socket listeners
     socket.on('previous messages', data => {
       data.forEach(msg => {
         createMessageElement(msg, msg.name === name);
@@ -375,14 +496,22 @@
     socket.on('react message', ({ id, reactions }) => {
       const msg = document.querySelector(`[data-id="${id}"]`);
       if (msg) {
-        const reactionHTML = Object.values(reactions).map(r => `<span class="reaction">${r}</span>`).join('');
         let rDiv = msg.querySelector('.reactions');
-        if (!rDiv) {
-          rDiv = document.createElement('div');
-          rDiv.className = 'reactions';
-          msg.appendChild(rDiv);
+        
+        if (Object.keys(reactions).length > 0) {
+          const reactionHTML = Object.entries(reactions)
+            .map(([user, emoji]) => `<span class="reaction" title="${user}">${emoji}</span>`)
+            .join('');
+          
+          if (!rDiv) {
+            rDiv = document.createElement('div');
+            rDiv.className = 'reactions';
+            msg.appendChild(rDiv);
+          }
+          rDiv.innerHTML = reactionHTML;
+        } else if (rDiv) {
+          rDiv.remove();
         }
-        rDiv.innerHTML = reactionHTML;
       }
     });
 
@@ -391,6 +520,7 @@
       sys.className = 'system';
       sys.innerText = `${user} joined the chat`;
       messages.appendChild(sys);
+      messages.scrollTop = messages.scrollHeight;
     });
 
     socket.on('user left', user => {
@@ -398,6 +528,7 @@
       sys.className = 'system';
       sys.innerText = `${user} left the chat`;
       messages.appendChild(sys);
+      messages.scrollTop = messages.scrollHeight;
     });
 
     socket.on('typing', user => {
@@ -417,7 +548,7 @@
       }
     });
 
-    // === Clear All Chat Feature ===
+    // Clear all chat feature
     document.getElementById('clear-chat-btn').addEventListener('click', () => {
       if (confirm("Are you sure you want to clear the chat for everyone?")) {
         socket.emit('clear all chat');
@@ -428,7 +559,7 @@
       document.getElementById('messages').innerHTML = '';
     });
 
-    // === Voice Streaming ===
+    // === VOICE STREAMING - All original functionality preserved ===
     let audioContext, mediaStream, source, processor;
     let isStreaming = false;
 
@@ -476,11 +607,13 @@
       voiceBtn.classList.remove('speaking');
     }
 
+    // Voice button events
     voiceBtn.addEventListener('mousedown', startStreaming);
     voiceBtn.addEventListener('mouseup', stopStreaming);
     voiceBtn.addEventListener('touchstart', e => { e.preventDefault(); startStreaming(); });
     voiceBtn.addEventListener('touchend', e => { e.preventDefault(); stopStreaming(); });
 
+    // Voice playback
     const playbackContext = new (window.AudioContext || window.webkitAudioContext)();
     socket.on('voice-stream', data => {
       const int16 = new Int16Array(data);

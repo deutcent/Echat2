@@ -15,6 +15,7 @@ mongoose.connect('mongodb+srv://swatantrakumar1582011:EcaewvoJs0wWpHRn@cluster0.
   .then(() => console.log('✅ MongoDB Connected'))
   .catch(err => console.error(err));
 
+// Message schema with timestamp support
 const messageSchema = new mongoose.Schema({
   id: String,
   name: String,
@@ -34,7 +35,7 @@ let messageReactions = new Map();
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// === File Upload (accepts GIFs and images, files) ===
+// === File Upload - Now supports GIFs explicitly ===
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, 'uploads');
@@ -45,7 +46,15 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + '-' + file.originalname);
   }
 });
-const upload = multer({ storage });
+
+// Accept all file types including GIFs
+const upload = multer({ 
+  storage,
+  fileFilter: (req, file, cb) => {
+    // Accept all file types
+    cb(null, true);
+  }
+});
 
 app.post('/upload', upload.single('file'), (req, res) => {
   if (req.file) {
@@ -64,7 +73,7 @@ io.on('connection', socket => {
     io.emit('online users', { count: users.length, users });
   };
 
-  // Send previous messages to newly connected socket
+  // Send previous messages with timestamps
   Message.find().sort({ timestamp: 1 }).then(messages => {
     socket.emit('previous messages', messages);
   });
@@ -76,57 +85,87 @@ io.on('connection', socket => {
     broadcastUsers();
   });
 
+  // Text messages
   socket.on('chat message', async (data) => {
     data.reactions = {};
+    data.timestamp = data.timestamp || Date.now();
     const msg = new Message(data);
     await msg.save();
     io.emit('chat message', data);
   });
 
+  // Image messages (including GIFs)
   socket.on('chat image', async (data) => {
     data.reactions = {};
+    data.timestamp = data.timestamp || Date.now();
     const msg = new Message(data);
     await msg.save();
     io.emit('chat image', data);
   });
 
+  // File messages
   socket.on('chat file', async (data) => {
     data.reactions = {};
+    data.timestamp = data.timestamp || Date.now();
     const msg = new Message(data);
     await msg.save();
     io.emit('chat file', data);
   });
 
+  // Typing indicator
   socket.on('typing', name => {
     socket.broadcast.emit('typing', name);
   });
 
+  // Voice streaming - Original functionality preserved
   socket.on('voice-stream', data => {
     socket.broadcast.emit('voice-stream', data);
   });
 
+  // Clear all chat
   socket.on('clear all chat', async () => {
     await Message.deleteMany({});
+    messageReactions.clear();
     io.emit('clear all chat');
   });
 
+  // Delete message
   socket.on('delete message', async (id) => {
     await Message.deleteOne({ id });
+    messageReactions.delete(id);
     io.emit('delete message', id);
   });
 
+  // React to message - Enhanced to handle multiple reactions better
   socket.on('react message', async ({ id, emoji, name }) => {
+    // Load current reactions from database if not in memory
     if (!messageReactions.has(id)) {
-      messageReactions.set(id, {});
+      const message = await Message.findOne({ id });
+      if (message && message.reactions) {
+        messageReactions.set(id, message.reactions);
+      } else {
+        messageReactions.set(id, {});
+      }
     }
+
     const reactions = messageReactions.get(id);
-    reactions[name] = emoji;
+    
+    // If user already reacted with this emoji, remove it (toggle)
+    if (reactions[name] === emoji) {
+      delete reactions[name];
+    } else {
+      // Otherwise, set/update their reaction
+      reactions[name] = emoji;
+    }
+    
     messageReactions.set(id, reactions);
 
+    // Update in database
     await Message.updateOne({ id }, { $set: { reactions } });
     io.emit('react message', { id, reactions });
   });
 
+  // User disconnect
   socket.on('disconnect', () => {
     if (userName) {
       onlineUsers.delete(socket.id);
