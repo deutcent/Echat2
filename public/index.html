@@ -112,7 +112,6 @@
       border: 1px solid #ddd;
     }
 
-    /* === Context Palette === */
     .palette {
       position: fixed;
       z-index: 1000;
@@ -251,7 +250,7 @@
     <div id="messages"></div>
     <form id="form">
       <label id="file-input-label" for="file-input">📎</label>
-      <input type="file" id="file-input" accept="image/*,.gif,.pdf,.doc,.docx,.txt,.mp4" />
+      <input type="file" id="file-input" accept="image/gif,image/*,.gif,.pdf,.doc,.docx,.txt,.mp4" />
       <button type="button" id="voice-btn">🎤</button>
       <input id="input" autocomplete="off" placeholder="Type a message..." required />
       <button type="submit">➤</button>
@@ -264,7 +263,6 @@
 
     let name = '';
     let password = '';
-    // Original password protection
     while (password !== 'stroracle') {
       password = prompt("Enter password to join:");
     }
@@ -280,15 +278,13 @@
     const fileInput = document.getElementById('file-input');
     const voiceBtn = document.getElementById('voice-btn');
 
-    // === Long Press / Right Click Palette ===
+    // SMART PALETTE POSITIONING - KEEPS ALL EMOJIS ON SCREEN
     function createPalette(x, y, msgId, isSender) {
-      // Remove existing palettes
       document.querySelectorAll('.palette').forEach(p => p.remove());
       
       const palette = document.createElement('div');
       palette.className = 'palette';
       
-      // Add emoji reactions
       ['❤️', '😂', '👍', '😮', '😢'].forEach(emoji => {
         const btn = document.createElement('button');
         btn.textContent = emoji;
@@ -300,7 +296,6 @@
         palette.appendChild(btn);
       });
       
-      // Add delete button for sender only
       if (isSender) {
         const delBtn = document.createElement('button');
         delBtn.textContent = '🗑️';
@@ -312,12 +307,48 @@
         palette.appendChild(delBtn);
       }
       
-      // Position palette
-      palette.style.top = y + 'px';
-      palette.style.left = x + 'px';
+      // Add invisibly to measure size
+      palette.style.visibility = 'hidden';
+      palette.style.position = 'fixed';
+      palette.style.top = '0px';
+      palette.style.left = '0px';
       document.body.appendChild(palette);
       
-      // Close on outside click or ESC
+      // Get dimensions
+      const rect = palette.getBoundingClientRect();
+      const paletteWidth = rect.width;
+      const paletteHeight = rect.height;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      // Smart positioning
+      let finalX = x;
+      let finalY = y;
+      
+      // Don't go off right edge
+      if (x + paletteWidth > viewportWidth) {
+        finalX = viewportWidth - paletteWidth - 10;
+      }
+      // Don't go off left edge
+      if (finalX < 10) {
+        finalX = 10;
+      }
+      
+      // Don't go off bottom edge
+      if (y + paletteHeight > viewportHeight) {
+        finalY = y - paletteHeight - 10; // Show above click
+      }
+      // Don't go off top edge
+      if (finalY < 10) {
+        finalY = 10;
+      }
+      
+      // Apply position and show
+      palette.style.top = finalY + 'px';
+      palette.style.left = finalX + 'px';
+      palette.style.visibility = 'visible';
+      
+      // Close handlers
       const closeHandler = (ev) => {
         if (!palette.contains(ev.target)) {
           palette.remove();
@@ -345,17 +376,13 @@
         clearTimeout(pressTimer);
       };
       
-      // Touch events for mobile
       msgElement.addEventListener('touchstart', startPress);
       msgElement.addEventListener('touchend', cancelPress);
       msgElement.addEventListener('touchmove', cancelPress);
-      
-      // Mouse events for desktop
       msgElement.addEventListener('mousedown', startPress);
       msgElement.addEventListener('mouseup', cancelPress);
       msgElement.addEventListener('mouseleave', cancelPress);
       
-      // Right-click context menu
       msgElement.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         createPalette(e.clientX, e.clientY, msgElement.dataset.id, isSender);
@@ -369,7 +396,6 @@
 
       let content = `<span class="username">${data.name}</span>${data.message || ''}`;
       
-      // Handle images, GIFs, and files
       if (data.type === 'image' || data.type === 'gif') {
         content += `<br><img class="chat-image" src="${data.url}" alt="Image/GIF" />`;
         content += `<br><a class="download-link" href="${data.url}" download>⬇️ Download Image</a>`;
@@ -377,11 +403,9 @@
         content += `<div>📄 ${data.filename}</div><a class="download-link" href="${data.url}" download>⬇️ Download</a>`;
       }
 
-      // Add timestamp
       const timestamp = new Date(data.timestamp || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
       content += `<span class="timestamp">${timestamp}</span>`;
 
-      // Reactions display
       if (data.reactions && Object.keys(data.reactions).length > 0) {
         const reactions = Object.entries(data.reactions)
           .map(([user, emoji]) => `<span class="reaction" title="${user}">${emoji}</span>`)
@@ -393,11 +417,9 @@
       messages.appendChild(msg);
       messages.scrollTop = messages.scrollHeight;
 
-      // Attach long press and context menu
       attachLongPressAndContext(msg, isSender);
     }
 
-    // Text message submission
     form.addEventListener('submit', e => {
       e.preventDefault();
       if (input.value) {
@@ -409,7 +431,6 @@
       }
     });
 
-    // File upload handling
     fileInput.addEventListener('change', () => {
       const file = fileInput.files[0];
       if (file) {
@@ -438,7 +459,6 @@
       }
     });
 
-    // Clipboard paste functionality for images and GIFs
     document.addEventListener('paste', async (e) => {
       const items = e.clipboardData?.items || [];
       const imageItem = [...items].find(item => item.type.startsWith('image/'));
@@ -465,12 +485,10 @@
       createMessageElement(payload, true);
     });
 
-    // Typing indicator
     input.addEventListener('input', () => {
       socket.emit('typing', name);
     });
 
-    // Socket listeners
     socket.on('previous messages', data => {
       data.forEach(msg => {
         createMessageElement(msg, msg.name === name);
@@ -548,7 +566,6 @@
       }
     });
 
-    // Clear all chat feature
     document.getElementById('clear-chat-btn').addEventListener('click', () => {
       if (confirm("Are you sure you want to clear the chat for everyone?")) {
         socket.emit('clear all chat');
@@ -559,7 +576,7 @@
       document.getElementById('messages').innerHTML = '';
     });
 
-    // === VOICE STREAMING - All original functionality preserved ===
+    // VOICE STREAMING
     let audioContext, mediaStream, source, processor;
     let isStreaming = false;
 
@@ -607,13 +624,11 @@
       voiceBtn.classList.remove('speaking');
     }
 
-    // Voice button events
     voiceBtn.addEventListener('mousedown', startStreaming);
     voiceBtn.addEventListener('mouseup', stopStreaming);
     voiceBtn.addEventListener('touchstart', e => { e.preventDefault(); startStreaming(); });
     voiceBtn.addEventListener('touchend', e => { e.preventDefault(); stopStreaming(); });
 
-    // Voice playback
     const playbackContext = new (window.AudioContext || window.webkitAudioContext)();
     socket.on('voice-stream', data => {
       const int16 = new Int16Array(data);
