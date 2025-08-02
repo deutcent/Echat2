@@ -1,120 +1,196 @@
-/***********************************************************************
- Echat – FULL SERVER
- Features:
-   • Express + Socket.IO
-   • MongoDB persistence (messages + reactions)
-   • AWS S3 (multer-s3) persistent file storage
-   • Voice streaming passthrough
-   • Clear-chat, delete message, reactions
-***********************************************************************/
-require('dotenv').config();
-const path     = require('path');
-const fs       = require('fs');
-const express  = require('express');
-const http     = require('http');
-const { Server }=require('socket.io');
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const path = require('path');
+const multer = require('multer');
+const fs = require('fs');
 const mongoose = require('mongoose');
-/* ---------- S3 ---------- */
-const { S3Client }      = require('@aws-sdk/client-s3');
-const multer            = require('multer');
-const multerS3          = require('multer-s3');
 
-/* ---------- 0. App ---------- */
 const app = express();
 const server = http.createServer(app);
-const io  = new Server(server);
+const io = socketIo(server);
 
-/* ---------- 1. MongoDB ---------- */
-mongoose.connect(process.env.MONGODB_URI
-  || 'mongodb+srv://swatantrakumar1582011:EcaewvoJs0wWpHRn@cluster0.x90rnfu.mongodb.net/Echat?retryWrites=true&w=majority')
-  .then(()=>console.log('✅ MongoDB connected'))
-  .catch(console.error);
+// === MongoDB Connection ===
+mongoose.connect('mongodb+srv://swatantrakumar1582011:EcaewvoJs0wWpHRn@cluster0.x90rnfu.mongodb.net/Echat?retryWrites=true&w=majority&appName=Cluster0')
+  .then(() => console.log('✅ MongoDB Connected'))
+  .catch(err => console.error(err));
 
-const Msg = mongoose.model('Message', new mongoose.Schema({
-  id:String,name:String,message:String,url:String,filename:String,
-  type:String,reactions:Object,timestamp:Date
-}));
+// Message schema with timestamp support
+const messageSchema = new mongoose.Schema({
+  id: String,
+  name: String,
+  message: String,
+  url: String,
+  filename: String,
+  type: String,
+  reactions: Object,
+  timestamp: { type: Date, default: Date.now }
+});
+const Message = mongoose.model('Message', messageSchema);
 
-/* ---------- 2. S3 upload ---------- */
-const s3=new S3Client({
-  region: process.env.AWS_REGION || 'us-east-1',
-  credentials:{
-    accessKeyId:process.env.AWS_ACCESS_KEY_ID||'demo',
-    secretAccessKey:process.env.AWS_SECRET_ACCESS_KEY||'demo'
+// === Online Users & Reactions ===
+let onlineUsers = new Map();
+let messageReactions = new Map();
+
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// === Enhanced File Upload - Now supports GIFs with better handling ===
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + '-' + file.originalname);
   }
 });
-const upload=multer({
-  storage:multerS3({
-    s3,bucket:process.env.AWS_S3_BUCKET||'echat-demo-bucket',acl:'public-read',
-    key:(req,file,cb)=>cb(null,Date.now()+'-'+file.originalname)
-  }),
-  limits:{fileSize:10*1024*1024}
+
+// Enhanced file filter with size limits
+const upload = multer({ 
+  storage,
+  limits: { 
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+    files: 1
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept all file types including GIFs
+    console.log('Uploading file:', file.originalname, 'Type:', file.mimetype);
+    cb(null, true);
+  }
 });
 
-app.use(express.static(path.join(__dirname,'public')));
-app.post('/upload',upload.single('file'),(req,res)=>{
-  if(!req.file)return res.status(400).json({error:'no file'});
-  res.json({fileUrl:req.file.location});
+app.post('/upload', upload.single('file'), (req, res) => {
+  if (req.file) {
+    console.log('File uploaded successfully:', req.file.filename);
+    res.json({ 
+      fileUrl: `/uploads/${req.file.filename}`,
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      size: req.file.size
+    });
+  } else {
+    res.status(400).json({ error: 'No file uploaded' });
+  }
 });
 
-/* ---------- 3. Socket.IO ---------- */
-const online=new Map(), reactions=new Map();
+// === Socket.IO Logic with Enhanced GIF Support ===
+io.on('connection', socket => {
+  let userName = '';
 
-io.on('connection',socket=>{
-  /* ---- history ---- */
-  Msg.find().sort({timestamp:1}).then(m=>socket.emit('previous messages',m));
-  let user='';
-
-  /* ---- join ---- */
-  socket.on('user joined',name=>{
-    user=name;online.set(socket.id,name);
-    io.emit('user joined',name);
-    io.emit('online users',{count:online.size,users:[...online.values()]});
-  });
-
-  /* helper store+emit */
-  const store = async (evt,d)=>{
-    d.reactions={};d.timestamp=d.timestamp||Date.now();
-    await new Msg(d).save();io.emit(evt,d);
+  const broadcastUsers = () => {
+    const users = Array.from(onlineUsers.values());
+    io.emit('online users', { count: users.length, users });
   };
-  socket.on('chat message',d=>store('chat message',d));
-  socket.on('chat image',  d=>store('chat image',  d));
-  socket.on('chat file',   d=>store('chat file',   d));
 
-  /* typing & voice passthrough */
-  socket.on('typing',n=>socket.broadcast.emit('typing',n));
-  socket.on('voice-stream',d=>socket.broadcast.emit('voice-stream',d));
-
-  /* clear chat */
-  socket.on('clear all chat',async()=>{
-    await Msg.deleteMany({});reactions.clear();io.emit('clear all chat');
+  // Send previous messages with timestamps
+  Message.find().sort({ timestamp: 1 }).then(messages => {
+    socket.emit('previous messages', messages);
   });
 
-  /* delete message */
-  socket.on('delete message',async id=>{
-    await Msg.deleteOne({id});reactions.delete(id);io.emit('delete message',id);
+  socket.on('user joined', name => {
+    userName = name;
+    onlineUsers.set(socket.id, name);
+    io.emit('user joined', name);
+    broadcastUsers();
   });
 
-  /* react / toggle */
-  socket.on('react message',async({id,emoji,name})=>{
-    if(!reactions.has(id)){
-      const m=await Msg.findOne({id});reactions.set(id,m?.reactions||{});
+  // Text messages
+  socket.on('chat message', async (data) => {
+    data.reactions = {};
+    data.timestamp = data.timestamp || Date.now();
+    const msg = new Message(data);
+    await msg.save();
+    io.emit('chat message', data);
+  });
+
+  // Image messages (including GIFs) - Enhanced handling
+  socket.on('chat image', async (data) => {
+    data.reactions = {};
+    data.timestamp = data.timestamp || Date.now();
+    
+    // Log GIF handling
+    if (data.type === 'gif') {
+      console.log('Processing GIF message:', data.filename);
     }
-    const r=reactions.get(id);
-    (r[name]===emoji)?delete r[name]:r[name]=emoji;
-    reactions.set(id,r);
-    await Msg.updateOne({id},{$set:{reactions:r}});
-    io.emit('react message',{id,reactions:r});
+    
+    const msg = new Message(data);
+    await msg.save();
+    io.emit('chat image', data);
   });
 
-  /* disconnect */
-  socket.on('disconnect',()=>{
-    if(user){online.delete(socket.id);io.emit('user left',user);
-      io.emit('online users',{count:online.size,users:[...online.values()]});
+  // File messages
+  socket.on('chat file', async (data) => {
+    data.reactions = {};
+    data.timestamp = data.timestamp || Date.now();
+    const msg = new Message(data);
+    await msg.save();
+    io.emit('chat file', data);
+  });
+
+  // Typing indicator
+  socket.on('typing', name => {
+    socket.broadcast.emit('typing', name);
+  });
+
+  // Voice streaming - Original functionality preserved
+  socket.on('voice-stream', data => {
+    socket.broadcast.emit('voice-stream', data);
+  });
+
+  // Clear all chat
+  socket.on('clear all chat', async () => {
+    await Message.deleteMany({});
+    messageReactions.clear();
+    io.emit('clear all chat');
+  });
+
+  // Delete message
+  socket.on('delete message', async (id) => {
+    await Message.deleteOne({ id });
+    messageReactions.delete(id);
+    io.emit('delete message', id);
+  });
+
+  // React to message - Enhanced to handle multiple reactions
+  socket.on('react message', async ({ id, emoji, name }) => {
+    // Load current reactions from database if not in memory
+    if (!messageReactions.has(id)) {
+      const message = await Message.findOne({ id });
+      if (message && message.reactions) {
+        messageReactions.set(id, message.reactions);
+      } else {
+        messageReactions.set(id, {});
+      }
+    }
+
+    const reactions = messageReactions.get(id);
+    
+    // Toggle reaction - if user already reacted with this emoji, remove it
+    if (reactions[name] === emoji) {
+      delete reactions[name];
+    } else {
+      // Otherwise, set/update their reaction
+      reactions[name] = emoji;
+    }
+    
+    messageReactions.set(id, reactions);
+
+    // Update in database
+    await Message.updateOne({ id }, { $set: { reactions } });
+    io.emit('react message', { id, reactions });
+  });
+
+  // User disconnect
+  socket.on('disconnect', () => {
+    if (userName) {
+      onlineUsers.delete(socket.id);
+      io.emit('user left', userName);
+      broadcastUsers();
     }
   });
 });
 
-/* ---------- 4. Start ---------- */
-const PORT=process.env.PORT||3000;
-server.listen(PORT,()=>console.log(`✅  Server http://localhost:${PORT}`));
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`✅ Enhanced Server with GIF support running at http://localhost:${PORT}`));
