@@ -1087,9 +1087,9 @@
 
     function loadTrendingGifs() {
       gifGrid.innerHTML = '<div style="text-align: center; padding: 20px; color: #8696a0;">Loading GIFs...</div>';
-      
       const apiKey = 'lEsx7w24RfoO4LFWIwEQvaUj1ECKob69';
-      const limit = 30;
+const limit = 30;
+
       
       fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${apiKey}&limit=${limit}`)
         .then(response => response.json())
@@ -1110,8 +1110,8 @@
       
       gifGrid.innerHTML = '<div style="text-align: center; padding: 20px; color: #8696a0;">Searching...</div>';
       
-      const apiKey = 'lEsx7w24RfoO4LFWIwEQvaUj1ECKob69';
-      const limit = 30;
+const apiKey = 'lEsx7w24RfoO4LFWIwEQvaUj1ECKob69';
+const limit = 30;
       
       fetch(`https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(query)}&limit=${limit}`)
         .then(response => response.json())
