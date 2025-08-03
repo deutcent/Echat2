@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
-  <title>Echat - Enhanced with GIF Picker</title>
+  <title>Echat</title>
   <style>
     * {
       box-sizing: border-box;
@@ -1075,7 +1075,7 @@
       }
     });
 
-    // GIF Picker Functions
+    // ================== UPDATED GIF PICKER FUNCTIONS ==================
     function showGifPicker() {
       gifPicker.classList.add('show');
       loadTrendingGifs();
@@ -1086,18 +1086,15 @@
     }
 
     function loadTrendingGifs() {
-      // Show loading state
       gifGrid.innerHTML = '<div style="text-align: center; padding: 20px; color: #8696a0;">Loading GIFs...</div>';
       
-      // Using Tenor API (new key)
-      const apiKey = 'AIzaSyCOe-EJeTaotEhEzJD_awo8as1qEIKtcnA';
-      const searchTerm = 'trending';
+      const apiKey = 'lEsx7w24RfoO4LFWIwEQvaUj1ECKob69';
       const limit = 30;
       
-      fetch(`https://tenor.googleapis.com/v2/search?q=${searchTerm}&key=${apiKey}&client_key=echat&limit=${limit}&media_filter=gif`)
+      fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${apiKey}&limit=${limit}`)
         .then(response => response.json())
         .then(data => {
-          displayGifs(data.results);
+          displayGifs(data.data);
         })
         .catch(error => {
           console.error('Error loading GIFs:', error);
@@ -1113,13 +1110,13 @@
       
       gifGrid.innerHTML = '<div style="text-align: center; padding: 20px; color: #8696a0;">Searching...</div>';
       
-      const apiKey = 'AIzaSyCOe-EJeTaotEhEzJD_awo8as1qEIKtcnA';
+      const apiKey = 'lEsx7w24RfoO4LFWIwEQvaUj1ECKob69';
       const limit = 30;
       
-      fetch(`https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=${apiKey}&client_key=echat&limit=${limit}&media_filter=gif`)
+      fetch(`https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(query)}&limit=${limit}`)
         .then(response => response.json())
         .then(data => {
-          displayGifs(data.results);
+          displayGifs(data.data);
         })
         .catch(error => {
           console.error('Error searching GIFs:', error);
@@ -1138,7 +1135,10 @@
       gifs.forEach(gif => {
         const gifItem = document.createElement('div');
         gifItem.className = 'gif-item';
-        gifItem.innerHTML = `<img src="${gif.media_formats.nanogif.url}" alt="${gif.content_description}" loading="lazy">`;
+        
+        // Use downsized version for preview
+        const previewUrl = gif.images.downsized.url;
+        gifItem.innerHTML = `<img src="${previewUrl}" alt="${gif.title || 'GIF'}" loading="lazy">`;
         
         gifItem.onclick = () => {
           selectGif(gif);
@@ -1150,12 +1150,15 @@
 
     function selectGif(gif) {
       const id = Date.now().toString();
+      
+      // Use original version for chat
+      const gifUrl = gif.images.original.url;
       const payload = {
         id,
         name,
-        url: gif.media_formats.gif.url,
+        url: gifUrl,
         type: 'gif',
-        filename: gif.content_description || 'gif',
+        filename: gif.title || 'gif',
         timestamp: Date.now()
       };
       
@@ -1202,8 +1205,8 @@
             const imgId = Date.now().toString() + Math.random();
             const isGif = img.src.toLowerCase().includes('.gif') || 
                          img.dataset.type === 'gif' ||
-                         img.src.includes('tenor') || 
-                         img.src.includes('giphy');
+                         img.src.includes('giphy') || 
+                         img.src.includes('tenor');
             
             const payload = { 
               id: imgId, 
@@ -1660,7 +1663,7 @@
     
     handleViewportResize();
 
-    console.log('✅ Enhanced Echat with GIF Picker and image viewer loaded');
+    console.log('✅ Enhanced Echat with GIPHY GIF Picker loaded');
   </script>
 </body>
 </html>
