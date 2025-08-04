@@ -130,9 +130,113 @@
       margin-top: 4px;
       display: block;
       opacity: 0.8;
+      text-align: right;
     }
 
-    /* FIXED: Added styling for clickable links in messages */
+    /* NEW: Date header styles */
+    .date-header {
+      text-align: center;
+      color: #8696a0;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin: 16px 0;
+      padding: 8px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .date-header::before,
+    .date-header::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 30%;
+      height: 1px;
+      background: rgba(134, 150, 160, 0.3);
+    }
+
+    .date-header::before {
+      left: 0;
+    }
+
+    .date-header::after {
+      right: 0;
+    }
+
+    /* NEW: Reply feature styles */
+    .reply-container {
+      border-left: 3px solid #128c7e;
+      padding: 6px 10px;
+      margin-bottom: 8px;
+      background: rgba(18, 140, 126, 0.05);
+      border-radius: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .reply-sender {
+      font-weight: 600;
+      color: #128c7e;
+      font-size: 0.8em;
+    }
+
+    .reply-content {
+      font-size: 0.85em;
+      color: #667781;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .reply-preview {
+      position: relative;
+      border-left: 3px solid #128c7e;
+      padding-left: 10px;
+      margin-bottom: 8px;
+      background: rgba(18, 140, 126, 0.05);
+      border-radius: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .reply-preview .name {
+      font-weight: 600;
+      color: #128c7e;
+      font-size: 0.85em;
+    }
+
+    .reply-preview .content {
+      font-size: 0.85em;
+      color: #667781;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .reply-preview .close-reply {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: none;
+      border: none;
+      color: #8696a0;
+      font-size: 16px;
+      cursor: pointer;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+    }
+
+    .reply-preview .close-reply:hover {
+      background: rgba(134, 150, 160, 0.1);
+    }
+
+    /* Link styles */
     .message-link {
       color: #128c7e;
       text-decoration: underline;
@@ -173,7 +277,7 @@
       box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
 
-    /* FIXED: Reaction popup positioning within chat container boundaries */
+    /* Reaction popup positioning */
     .palette {
       position: absolute;
       z-index: 10000;
@@ -246,7 +350,7 @@
       min-height: 64px;
     }
 
-    /* Enhanced rich input for typing and Gboard GIF compatibility */
+    /* Enhanced rich input */
     #rich-input {
       flex: 1;
       padding: 12px 16px;
@@ -393,7 +497,7 @@
       box-shadow: 0 4px 12px rgba(255, 59, 48, 0.4);
     }
 
-    /* NEW: GIF Picker Styles */
+    /* GIF Picker Styles */
     #gif-picker {
       position: absolute;
       bottom: 80px;
@@ -584,6 +688,16 @@
       z-index: 10;
     }
 
+    /* Highlight animation for message replies */
+    @keyframes highlight {
+      0% { background-color: rgba(37, 211, 102, 0.3); }
+      100% { background-color: transparent; }
+    }
+
+    .highlighted {
+      animation: highlight 1.5s ease;
+    }
+
     /* Enhanced mobile responsiveness */
     @media (max-width: 600px) {
       #chat-container {
@@ -755,6 +869,24 @@
         background: #3b4a54;
         color: #aebac1;
       }
+      
+      .date-header {
+        color: #aebac1;
+      }
+      
+      .date-header::before,
+      .date-header::after {
+        background: rgba(174, 186, 193, 0.3);
+      }
+      
+      .reply-container, .reply-preview {
+        background: rgba(79, 195, 247, 0.1);
+        border-left-color: #4fc3f7;
+      }
+      
+      .reply-sender, .reply-preview .name {
+        color: #4fc3f7;
+      }
     }
   </style>
 </head>
@@ -767,6 +899,17 @@
     <div id="user-list">Users: Loading...</div>
     <button id="clear-chat-btn">🧹 Clear All Chat</button>
     <div id="messages"></div>
+    
+    <!-- Reply Preview -->
+    <div id="reply-preview" style="display: none;">
+      <div class="reply-preview">
+        <div>
+          <span class="name">Replying to <span id="reply-to-name"></span></span>
+          <div class="content" id="reply-content"></div>
+        </div>
+        <button class="close-reply" id="cancel-reply">×</button>
+      </div>
+    </div>
     
     <!-- GIF Picker -->
     <div id="gif-picker">
@@ -842,14 +985,24 @@
     const gifSearchInput = document.getElementById('gif-search-input');
     const lightbox = document.getElementById('lightbox');
     const lightboxImage = document.getElementById('lightbox-image');
+    const replyPreview = document.getElementById('reply-preview');
+    const replyToName = document.getElementById('reply-to-name');
+    const replyContent = document.getElementById('reply-content');
+    const cancelReplyBtn = document.getElementById('cancel-reply');
+    
+    // Store the message being replied to
+    let replyingToMessage = null;
+    
+    // Track the last displayed date
+    let lastDisplayedDate = null;
 
-    // Enhanced input setup for maximum Gboard compatibility
+    // Enhanced input setup
     richInput.setAttribute('contenteditable', 'true');
     richInput.setAttribute('data-supports-images', 'true');
     richInput.setAttribute('data-supports-gifs', 'true');
     richInput.setAttribute('enterkeyhint', 'send');
     
-    // Link detection function for clickable URLs
+    // Link detection function
     function detectAndCreateLinks(text) {
       const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[^\s]+\.[a-z]{2,}(?:\/[^\s]*)?)/gi;
       
@@ -863,22 +1016,102 @@
       });
     }
     
-    // FIXED: Popup positioning within chat container boundaries
-    function createPalette(x, y, msgId, isSender) {
+    // Format date for display (Today, Yesterday, or full date)
+    function formatMessageDate(timestamp) {
+      const date = new Date(timestamp);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+      } else {
+        return date.toLocaleDateString('en-US', { 
+          month: 'long', 
+          day: 'numeric', 
+          year: 'numeric' 
+        });
+      }
+    }
+    
+    // Show date header if needed
+    function showDateHeaderIfNeeded(timestamp) {
+      const dateStr = formatMessageDate(timestamp);
+      
+      if (lastDisplayedDate !== dateStr) {
+        const header = document.createElement('div');
+        header.className = 'date-header';
+        header.textContent = dateStr;
+        messages.appendChild(header);
+        
+        lastDisplayedDate = dateStr;
+      }
+    }
+    
+    // Show reply preview
+    function showReplyPreview(msgData) {
+      replyToName.textContent = msgData.name;
+      
+      // Get content preview
+      let contentPreview = '';
+      if (msgData.message) {
+        contentPreview = msgData.message.length > 50 
+          ? msgData.message.substring(0, 50) + '...' 
+          : msgData.message;
+      } else if (msgData.type === 'image') {
+        contentPreview = '📷 Image';
+      } else if (msgData.type === 'gif') {
+        contentPreview = '🎬 GIF';
+      } else if (msgData.type === 'file') {
+        contentPreview = '📄 File';
+      }
+      
+      replyContent.textContent = contentPreview;
+      replyingToMessage = msgData;
+      replyPreview.style.display = 'block';
+      
+      // Scroll to input
+      richInput.focus();
+    }
+    
+    // Cancel reply
+    function cancelReply() {
+      replyingToMessage = null;
+      replyPreview.style.display = 'none';
+    }
+    
+    // Attach click handler to cancel reply button
+    cancelReplyBtn.addEventListener('click', cancelReply);
+    
+    // Create palette for message actions
+    function createPalette(x, y, msgData, isSender) {
       // Remove any existing palettes
       document.querySelectorAll('.palette').forEach(p => p.remove());
       
       const palette = document.createElement('div');
       palette.className = 'palette';
       
-      // Optimized emoji set for mobile
+      // Add reply button
+      const replyBtn = document.createElement('button');
+      replyBtn.textContent = '↩️';
+      replyBtn.title = 'Reply to message';
+      replyBtn.onclick = (e) => {
+        e.stopPropagation();
+        showReplyPreview(msgData);
+        palette.remove();
+      };
+      palette.appendChild(replyBtn);
+      
+      // Add reaction buttons
       ['❤️', '😂', '👍', '😮', '😢', '🔥'].forEach(emoji => {
         const btn = document.createElement('button');
         btn.textContent = emoji;
         btn.title = `React with ${emoji}`;
         btn.onclick = (e) => {
           e.stopPropagation();
-          socket.emit('react message', { id: msgId, emoji, name });
+          socket.emit('react message', { id: msgData.id, emoji, name });
           palette.remove();
         };
         palette.appendChild(btn);
@@ -893,18 +1126,18 @@
         delBtn.onclick = (e) => {
           e.stopPropagation();
           if (confirm('Delete this message?')) {
-            socket.emit('delete message', msgId);
+            socket.emit('delete message', msgData.id);
           }
           palette.remove();
         };
         palette.appendChild(delBtn);
       }
       
-      // FIXED: Append to chat container instead of body for proper boundaries
+      // Append to chat container
       const chatContainer = document.getElementById('chat-container');
       chatContainer.appendChild(palette);
       
-      // FIXED: Enhanced positioning algorithm for chat container boundaries
+      // Position the palette
       requestAnimationFrame(() => {
         const paletteRect = palette.getBoundingClientRect();
         const containerRect = chatContainer.getBoundingClientRect();
@@ -912,19 +1145,19 @@
         const containerHeight = chatContainer.offsetHeight;
         const padding = 16;
         
-        // Calculate position relative to chat container
+        // Calculate position
         let finalX = x - containerRect.left - paletteRect.width / 2;
         let finalY = y - containerRect.top - paletteRect.height - 16;
         
-        // Horizontal boundary checks within chat container
+        // Horizontal boundary checks
         if (finalX < padding) finalX = padding;
         if (finalX + paletteRect.width > containerWidth - padding) {
           finalX = containerWidth - paletteRect.width - padding;
         }
         
-        // Vertical boundary checks within chat container
+        // Vertical boundary checks
         if (finalY < padding) {
-          finalY = y - containerRect.top + 16; // Show below if no space above
+          finalY = y - containerRect.top + 16;
         }
         if (finalY + paletteRect.height > containerHeight - padding) {
           finalY = containerHeight - paletteRect.height - padding;
@@ -934,7 +1167,7 @@
         palette.style.top = finalY + 'px';
       });
       
-      // Enhanced close handlers
+      // Close handlers
       const closeHandler = (ev) => {
         if (!palette.contains(ev.target)) {
           palette.remove();
@@ -953,7 +1186,8 @@
       }, { once: true });
     }
 
-    function attachLongPressAndContext(msgElement, isSender) {
+    // Attach long press and context menu handlers
+    function attachLongPressAndContext(msgElement, isSender, msgData) {
       let pressTimer;
       let startPos = { x: 0, y: 0 };
       let moved = false;
@@ -965,7 +1199,7 @@
         
         pressTimer = setTimeout(() => {
           if (!moved) {
-            createPalette(startPos.x, startPos.y, msgElement.dataset.id, isSender);
+            createPalette(startPos.x, startPos.y, msgData, isSender);
           }
         }, 500);
       };
@@ -991,7 +1225,7 @@
       msgElement.addEventListener('touchend', cancelPress);
       msgElement.addEventListener('touchcancel', cancelPress);
       
-      // Mouse events for desktop
+      // Mouse events
       msgElement.addEventListener('mousedown', startPress);
       msgElement.addEventListener('mousemove', movePress);
       msgElement.addEventListener('mouseup', cancelPress);
@@ -1000,15 +1234,21 @@
       // Context menu
       msgElement.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        createPalette(e.clientX, e.clientY, msgElement.dataset.id, isSender);
+        createPalette(e.clientX, e.clientY, msgData, isSender);
       });
     }
 
-    // Enhanced message creation with clickable links and image viewer
+    // Enhanced message creation with date headers and reply support
     function createMessageElement(data, isSender = false) {
+      // Show date header if needed
+      showDateHeaderIfNeeded(data.timestamp);
+      
       const msg = document.createElement('div');
       msg.className = 'message ' + (isSender ? 'sender' : 'receiver');
       msg.dataset.id = data.id;
+      
+      // Store message data for later use
+      msg.dataset.message = JSON.stringify(data);
 
       // Process message text for links
       let messageText = data.message || '';
@@ -1017,7 +1257,29 @@
         messageText = detectAndCreateLinks(messageText);
       }
 
-      let content = `<span class="username">${data.name}</span>${messageText}`;
+      let content = '';
+      
+      // Add reply preview if this is a reply to another message
+      if (data.replyTo) {
+        const replyId = data.replyTo.id;
+        const replyPreview = document.createElement('div');
+        replyPreview.className = 'reply-container';
+        replyPreview.innerHTML = `
+          <span class="reply-sender">${data.replyTo.name}</span>
+          <span class="reply-content">${data.replyTo.preview}</span>
+        `;
+        replyPreview.addEventListener('click', () => {
+          const originalMsg = document.querySelector(`[data-id="${replyId}"]`);
+          if (originalMsg) {
+            originalMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            originalMsg.classList.add('highlighted');
+            setTimeout(() => originalMsg.classList.remove('highlighted'), 1500);
+          }
+        });
+        content += replyPreview.outerHTML;
+      }
+      
+      content += `<span class="username">${data.name}</span>${messageText}`;
       
       if (data.type === 'image') {
         content += `<br><img class="chat-image" src="${data.url}" alt="Image" loading="lazy" onclick="openLightbox('${data.url}')" />`;
@@ -1046,7 +1308,7 @@
         messages.scrollTop = messages.scrollHeight;
       });
 
-      attachLongPressAndContext(msg, isSender);
+      attachLongPressAndContext(msg, isSender, data);
     }
 
     // Lightbox functions
@@ -1075,7 +1337,7 @@
       }
     });
 
-    // ================== UPDATED GIF PICKER FUNCTIONS ==================
+    // GIF Picker Functions
     function showGifPicker() {
       gifPicker.classList.add('show');
       loadTrendingGifs();
@@ -1088,8 +1350,7 @@
     function loadTrendingGifs() {
       gifGrid.innerHTML = '<div style="text-align: center; padding: 20px; color: #8696a0;">Loading GIFs...</div>';
       const apiKey = 'lEsx7w24RfoO4LFWIwEQvaUj1ECKob69';
-const limit = 30;
-
+      const limit = 30;
       
       fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${apiKey}&limit=${limit}`)
         .then(response => response.json())
@@ -1110,8 +1371,8 @@ const limit = 30;
       
       gifGrid.innerHTML = '<div style="text-align: center; padding: 20px; color: #8696a0;">Searching...</div>';
       
-const apiKey = 'lEsx7w24RfoO4LFWIwEQvaUj1ECKob69';
-const limit = 30;
+      const apiKey = 'lEsx7w24RfoO4LFWIwEQvaUj1ECKob69';
+      const limit = 30;
       
       fetch(`https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(query)}&limit=${limit}`)
         .then(response => response.json())
@@ -1159,12 +1420,20 @@ const limit = 30;
         url: gifUrl,
         type: 'gif',
         filename: gif.title || 'gif',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        replyTo: replyingToMessage ? {
+          id: replyingToMessage.id,
+          name: replyingToMessage.name,
+          preview: replyingToMessage.message 
+            ? replyingToMessage.message.substring(0, 50) 
+            : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
+        } : null
       };
       
       socket.emit('chat image', payload);
       createMessageElement(payload, true);
       closeGifPicker();
+      cancelReply();
     }
 
     // GIF Picker Event Listeners
@@ -1214,7 +1483,14 @@ const limit = 30;
               url: img.src, 
               filename: img.alt || 'pasted-image', 
               timestamp: Date.now(),
-              type: isGif ? 'gif' : 'image'
+              type: isGif ? 'gif' : 'image',
+              replyTo: replyingToMessage ? {
+                id: replyingToMessage.id,
+                name: replyingToMessage.name,
+                preview: replyingToMessage.message 
+                  ? replyingToMessage.message.substring(0, 50) 
+                  : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
+              } : null
             };
             
             socket.emit('chat image', payload);
@@ -1223,13 +1499,26 @@ const limit = 30;
         }
         
         if (textContent) {
-          const msg = { id, name, message: textContent, timestamp: Date.now() };
+          const msg = { 
+            id, 
+            name, 
+            message: textContent, 
+            timestamp: Date.now(),
+            replyTo: replyingToMessage ? {
+              id: replyingToMessage.id,
+              name: replyingToMessage.name,
+              preview: replyingToMessage.message 
+                ? replyingToMessage.message.substring(0, 50) 
+                : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
+            } : null
+          };
           socket.emit('chat message', msg);
           createMessageElement(msg, true);
         }
         
         richInput.textContent = '';
         richInput.innerHTML = '';
+        cancelReply();
       }
     }
 
@@ -1247,7 +1536,7 @@ const limit = 30;
       }
     });
 
-    // Enhanced file input handler with better GIF detection
+    // File input handler
     fileInput.addEventListener('change', async () => {
       const file = fileInput.files[0];
       if (!file) return;
@@ -1281,7 +1570,14 @@ const limit = 30;
           timestamp: Date.now(),
           type: isGif ? 'gif' : (file.type.startsWith('image/') ? 'image' : 'file'),
           fileId: data.fileId,
-          mimeType: data.mimeType
+          mimeType: data.mimeType,
+          replyTo: replyingToMessage ? {
+            id: replyingToMessage.id,
+            name: replyingToMessage.name,
+            preview: replyingToMessage.message 
+              ? replyingToMessage.message.substring(0, 50) 
+              : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
+          } : null
         };
         
         socket.emit('chat image', payload);
@@ -1293,10 +1589,11 @@ const limit = 30;
       } finally {
         submitBtn.classList.remove('loading');
         fileInput.value = '';
+        cancelReply();
       }
     });
 
-    // Enhanced paste handler for maximum Gboard GIF compatibility
+    // Paste handler
     richInput.addEventListener('paste', async (e) => {
       const items = e.clipboardData?.items || [];
       let hasImage = false;
@@ -1333,7 +1630,14 @@ const limit = 30;
               filename: filename,
               timestamp: Date.now(),
               fileId: data.fileId,
-              mimeType: data.mimeType
+              mimeType: data.mimeType,
+              replyTo: replyingToMessage ? {
+                id: replyingToMessage.id,
+                name: replyingToMessage.name,
+                preview: replyingToMessage.message 
+                  ? replyingToMessage.message.substring(0, 50) 
+                  : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
+              } : null
             };
             
             socket.emit('chat image', payload);
@@ -1357,7 +1661,7 @@ const limit = 30;
       }
     });
 
-    // Enhanced input event for better rich content handling
+    // Input event
     let typingTimer;
     richInput.addEventListener('input', (e) => {
       clearTimeout(typingTimer);
@@ -1412,6 +1716,7 @@ const limit = 30;
 
     // Socket event handlers
     socket.on('previous messages', data => {
+      lastDisplayedDate = null;
       data.forEach(msg => {
         createMessageElement(msg, msg.name === name);
       });
@@ -1475,7 +1780,7 @@ const limit = 30;
       messages.scrollTop = messages.scrollHeight;
     });
 
-    // Enhanced typing indicator
+    // Typing indicator
     let typingUsers = new Set();
     let typingIndicator = null;
 
@@ -1530,9 +1835,12 @@ const limit = 30;
 
     socket.on('clear all chat', () => {
       messages.innerHTML = '';
+      lastDisplayedDate = null;
+      replyingToMessage = null;
+      replyPreview.style.display = 'none';
     });
 
-    // Enhanced voice streaming functionality
+    // Voice streaming functionality
     let audioContext, mediaStream, source, processor;
     let isStreaming = false;
 
@@ -1604,7 +1912,7 @@ const limit = 30;
       stopStreaming(); 
     });
 
-    // Enhanced voice playback
+    // Voice playback
     const playbackContext = new (window.AudioContext || window.webkitAudioContext)();
     socket.on('voice-stream', data => {
       try {
@@ -1624,7 +1932,7 @@ const limit = 30;
       }
     });
 
-    // Enhanced error handling and connection management
+    // Connection management
     socket.on('connect', () => {
       console.log('Connected to server');
       userList.textContent = 'Connected...';
@@ -1640,7 +1948,7 @@ const limit = 30;
       socket.emit('user joined', name);
     });
 
-    // Prevent zoom on double tap (iOS)
+    // Prevent zoom on double tap
     let lastTouchEnd = 0;
     document.addEventListener('touchend', function (event) {
       const now = (new Date()).getTime();
@@ -1650,7 +1958,7 @@ const limit = 30;
       lastTouchEnd = now;
     }, false);
 
-    // Enhanced mobile viewport handling
+    // Mobile viewport handling
     function handleViewportResize() {
       const vh = window.innerHeight * 0.01;
       document.documentElement.style.setProperty('--vh', `${vh}px`);
@@ -1663,7 +1971,7 @@ const limit = 30;
     
     handleViewportResize();
 
-    console.log('✅ Enhanced Echat with GIPHY GIF Picker loaded');
+    console.log('✅ Enhanced Echat with Date Headers and Reply Feature loaded');
   </script>
 </body>
 </html>
