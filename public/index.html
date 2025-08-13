@@ -67,7 +67,6 @@
       -webkit-overflow-scrolling: touch;
     }
 
-    /* Enhanced scrollbar for better mobile experience */
     #messages::-webkit-scrollbar {
       width: 4px;
     }
@@ -133,7 +132,7 @@
       text-align: right;
     }
 
-    /* NEW: Date header styles */
+    /* FIXED: Date header styles */
     .date-header {
       text-align: center;
       color: #8696a0;
@@ -141,8 +140,15 @@
       font-weight: 500;
       margin: 16px 0;
       padding: 8px;
-      position: relative;
-      z-index: 1;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(236, 229, 221, 0.85);
+      backdrop-filter: blur(5px);
+      border-radius: 20px;
+      max-width: 200px;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     .date-header::before,
@@ -162,8 +168,8 @@
     .date-header::after {
       right: 0;
     }
-
-    /* NEW: Reply feature styles */
+    
+    /* Reply feature styles */
     .reply-container {
       border-left: 3px solid #128c7e;
       padding: 6px 10px;
@@ -350,7 +356,6 @@
       min-height: 64px;
     }
 
-    /* Enhanced rich input */
     #rich-input {
       flex: 1;
       padding: 12px 16px;
@@ -697,6 +702,18 @@
     .highlighted {
       animation: highlight 1.5s ease;
     }
+    
+    /* NEW: Highlight animation for message replies */
+    @keyframes highlightBox {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); box-shadow: 0 0 15px rgba(37, 211, 102, 0.5); }
+      100% { transform: scale(1); }
+    }
+
+    .highlighted {
+      animation: highlightBox 1s ease;
+      border: 2px solid #25d366;
+    }
 
     /* Enhanced mobile responsiveness */
     @media (max-width: 600px) {
@@ -774,6 +791,12 @@
         font-size: 30px;
         width: 40px;
         height: 40px;
+      }
+      
+      .date-header {
+        font-size: 0.75rem;
+        padding: 6px;
+        max-width: 180px;
       }
     }
 
@@ -872,6 +895,7 @@
       
       .date-header {
         color: #aebac1;
+        background: rgba(11, 20, 26, 0.85);
       }
       
       .date-header::before,
@@ -886,6 +910,10 @@
       
       .reply-sender, .reply-preview .name {
         color: #4fc3f7;
+      }
+      
+      .highlighted {
+        border: 2px solid #4fc3f7;
       }
     }
   </style>
@@ -965,7 +993,7 @@
 
     let name = '';
     let password = '';
-    while (password !== 'oracle123') {
+    while (password !== 'oracle') {
       password = prompt("Enter password to join:");
     }
     while (!name) name = prompt("Enter your name:");
@@ -1103,6 +1131,46 @@
         palette.remove();
       };
       palette.appendChild(replyBtn);
+      
+      // NEW: Add copy button
+      const copyBtn = document.createElement('button');
+      copyBtn.textContent = '📋';
+      copyBtn.title = 'Copy text';
+      copyBtn.onclick = (e) => {
+        e.stopPropagation();
+        let textToCopy = msgData.message || '';
+        
+        if (!textToCopy) {
+          if (msgData.type === 'image' || msgData.type === 'gif') {
+            textToCopy = msgData.url;
+          } else if (msgData.type === 'file') {
+            textToCopy = `File: ${msgData.filename} - ${msgData.url}`;
+          }
+        }
+        
+        navigator.clipboard.writeText(textToCopy)
+          .then(() => {
+            const notification = document.createElement('div');
+            notification.className = 'system';
+            notification.textContent = 'Copied to clipboard!';
+            notification.style.position = 'fixed';
+            notification.style.bottom = '20px';
+            notification.style.left = '50%';
+            notification.style.transform = 'translateX(-50%)';
+            notification.style.padding = '10px 20px';
+            notification.style.borderRadius = '20px';
+            notification.style.backgroundColor = '#25d366';
+            notification.style.color = 'white';
+            notification.style.zIndex = '10000';
+            notification.style.animation = 'fadeOut 2s forwards';
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 2000);
+          })
+          .catch(err => console.error('Copy failed:', err));
+        
+        palette.remove();
+      };
+      palette.appendChild(copyBtn);
       
       // Add reaction buttons
       ['❤️', '😂', '👍', '😮', '😢', '🔥'].forEach(emoji => {
@@ -1971,7 +2039,7 @@
     
     handleViewportResize();
 
-    console.log('✅ Enhanced Echat with Date Headers and Reply Feature loaded');
+    console.log('✅ Enhanced Echat with all fixes loaded');
   </script>
 </body>
 </html>

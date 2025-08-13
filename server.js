@@ -19,7 +19,7 @@ mongoose.connect('mongodb+srv://swatantrakumar1582011:EcaewvoJs0wWpHRn@cluster0.
   })
   .catch(err => console.error(err));
 
-// Message schema
+// Message schema with replyTo structure
 const messageSchema = new mongoose.Schema({
   id: String,
   name: String,
@@ -31,13 +31,17 @@ const messageSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   fileId: mongoose.Schema.Types.ObjectId,
   fileSize: Number,
-  mimeType: String
+  mimeType: String,
+  replyTo: {
+    id: String,
+    name: String,
+    preview: String
+  }
 });
 const Message = mongoose.model('Message', messageSchema);
 
 // Online Users & Reactions
 let onlineUsers = new Map();
-let messageReactions = new Map();
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -144,6 +148,11 @@ io.on('connection', socket => {
 
   socket.on('chat message', async (data) => {
     try {
+      // Ensure replyTo structure is maintained
+      if (data.replyTo && !data.replyTo.id) {
+        delete data.replyTo;
+      }
+      
       data.reactions = data.reactions || {};
       data.timestamp = data.timestamp || Date.now();
       const msg = new Message(data);
@@ -157,6 +166,11 @@ io.on('connection', socket => {
 
   socket.on('chat image', async (data) => {
     try {
+      // Ensure replyTo structure is maintained
+      if (data.replyTo && !data.replyTo.id) {
+        delete data.replyTo;
+      }
+      
       data.reactions = data.reactions || {};
       data.timestamp = data.timestamp || Date.now();
       
@@ -179,6 +193,11 @@ io.on('connection', socket => {
 
   socket.on('chat file', async (data) => {
     try {
+      // Ensure replyTo structure is maintained
+      if (data.replyTo && !data.replyTo.id) {
+        delete data.replyTo;
+      }
+      
       data.reactions = data.reactions || {};
       data.timestamp = data.timestamp || Date.now();
       const msg = new Message(data);
@@ -223,7 +242,6 @@ io.on('connection', socket => {
       }
       
       await Message.deleteMany({});
-      messageReactions.clear();
       io.emit('clear all chat');
     } catch (error) {
       console.error('Error clearing chat:', error);
@@ -244,7 +262,6 @@ io.on('connection', socket => {
       }
       
       await Message.deleteOne({ id });
-      messageReactions.delete(id);
       io.emit('delete message', id);
     } catch (error) {
       console.error('Error deleting message:', error);
@@ -254,27 +271,20 @@ io.on('connection', socket => {
 
   socket.on('react message', async ({ id, emoji, name }) => {
     try {
-      if (!messageReactions.has(id)) {
-        const message = await Message.findOne({ id });
-        if (message && message.reactions) {
-          messageReactions.set(id, message.reactions);
-        } else {
-          messageReactions.set(id, {});
-        }
-      }
-
-      const reactions = messageReactions.get(id);
+      const message = await Message.findOne({ id });
+      if (!message) return;
       
-      if (reactions[name] === emoji) {
-        delete reactions[name];
+      if (!message.reactions) message.reactions = {};
+      
+      // Toggle reaction
+      if (message.reactions[name] === emoji) {
+        delete message.reactions[name];
       } else {
-        reactions[name] = emoji;
+        message.reactions[name] = emoji;
       }
       
-      messageReactions.set(id, reactions);
-
-      await Message.updateOne({ id }, { $set: { reactions } });
-      io.emit('react message', { id, reactions });
+      await Message.updateOne({ id }, { $set: { reactions: message.reactions } });
+      io.emit('react message', { id, reactions: message.reactions });
     } catch (error) {
       console.error('Error updating reaction:', error);
       socket.emit('error', { message: 'Failed to update reaction' });
@@ -312,4 +322,4 @@ process.on('SIGTERM', async () => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`✅ Enhanced Server with GridFS and mobile optimization running at http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`✅ Enhanced Server with all fixes running at http://localhost:${PORT}`));
