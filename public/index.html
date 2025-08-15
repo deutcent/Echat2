@@ -105,14 +105,14 @@
       float: right;
       text-align: right;
       border: 1px solid #c1e8b8;
-      border-bottom-right-radius: 6px;
+      border-radius: 18px 18px 6px 18px; /* Updated border-radius */
     }
 
     .receiver {
       background: #fff;
       float: left;
       border: 1px solid #e1e8ed;
-      border-bottom-left-radius: 6px;
+      border-radius: 18px 18px 18px 6px; /* Updated border-radius */
     }
 
     .username {
@@ -132,7 +132,6 @@
       text-align: right;
     }
 
-    /* FIXED: Date header styles */
     .date-header {
       text-align: center;
       color: #8696a0;
@@ -140,11 +139,8 @@
       font-weight: 500;
       margin: 16px 0;
       padding: 8px;
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      background: rgba(236, 229, 221, 0.85);
-      backdrop-filter: blur(5px);
+      z-index: 1;
+      background: rgba(236, 229, 221, 0.95);
       border-radius: 20px;
       max-width: 200px;
       margin-left: auto;
@@ -674,6 +670,8 @@
       max-height: 80vh;
       object-fit: contain;
       border-radius: 8px;
+      transition: transform 0.2s ease;
+      transform-origin: center center;
     }
 
     .lightbox-close {
@@ -691,6 +689,38 @@
       align-items: center;
       justify-content: center;
       z-index: 10;
+    }
+
+    /* Lightbox controls */
+    .lightbox-controls {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+      background: rgba(0,0,0,0.7);
+      padding: 8px 16px;
+      border-radius: 24px;
+    }
+
+    .lightbox-control {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+    }
+
+    .lightbox-control:hover {
+      background: rgba(255,255,255,0.2);
     }
 
     /* Highlight animation for message replies */
@@ -798,6 +828,17 @@
         padding: 6px;
         max-width: 180px;
       }
+      
+      .lightbox-controls {
+        bottom: 10px;
+        padding: 6px 12px;
+      }
+      
+      .lightbox-control {
+        font-size: 20px;
+        width: 36px;
+        height: 36px;
+      }
     }
 
     /* Dark mode support */
@@ -895,7 +936,7 @@
       
       .date-header {
         color: #aebac1;
-        background: rgba(11, 20, 26, 0.85);
+        background: rgba(11, 20, 26, 0.95);
       }
       
       .date-header::before,
@@ -979,11 +1020,16 @@
     </form>
   </div>
 
-  <!-- Lightbox for viewing images -->
+  <!-- Lightbox for viewing images with zoom controls -->
   <div id="lightbox" class="lightbox" style="display: none;">
     <span class="lightbox-close" onclick="closeLightbox()">×</span>
     <div class="lightbox-content">
       <img id="lightbox-image" class="lightbox-image" src="" alt="Enlarged view">
+    </div>
+    <div class="lightbox-controls">
+      <button class="lightbox-control" id="lightbox-zoom-out" title="Zoom Out">−</button>
+      <button class="lightbox-control" id="lightbox-reset-zoom" title="Reset Zoom">↺</button>
+      <button class="lightbox-control" id="lightbox-zoom-in" title="Zoom In">+</button>
     </div>
   </div>
 
@@ -1024,6 +1070,13 @@
     // Track the last displayed date
     let lastDisplayedDate = null;
 
+    // Lightbox zoom state
+    let currentScale = 1;
+    let minScale = 0.5;
+    let maxScale = 4;
+    let isDragging = false;
+    let startX, startY, scrollLeft, scrollTop;
+
     // Enhanced input setup
     richInput.setAttribute('contenteditable', 'true');
     richInput.setAttribute('data-supports-images', 'true');
@@ -1050,16 +1103,16 @@
       const today = new Date();
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-      
+
       if (date.toDateString() === today.toDateString()) {
         return 'Today';
       } else if (date.toDateString() === yesterday.toDateString()) {
         return 'Yesterday';
       } else {
-        return date.toLocaleDateString('en-US', { 
-          month: 'long', 
-          day: 'numeric', 
-          year: 'numeric' 
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
         });
       }
     }
@@ -1068,14 +1121,17 @@
     function showDateHeaderIfNeeded(timestamp) {
       const dateStr = formatMessageDate(timestamp);
       
-      if (lastDisplayedDate !== dateStr) {
-        const header = document.createElement('div');
-        header.className = 'date-header';
-        header.textContent = dateStr;
-        messages.appendChild(header);
-        
-        lastDisplayedDate = dateStr;
+      // Avoid duplicates in a row
+      if (lastDisplayedDate && lastDisplayedDate === dateStr) {
+        return;
       }
+
+      const header = document.createElement('div');
+      header.className = 'date-header';
+      header.textContent = dateStr;
+      messages.appendChild(header);
+
+      lastDisplayedDate = dateStr;
     }
     
     // Show reply preview
@@ -1132,7 +1188,7 @@
       };
       palette.appendChild(replyBtn);
       
-      // NEW: Add copy button
+      // Add copy button
       const copyBtn = document.createElement('button');
       copyBtn.textContent = '📋';
       copyBtn.title = 'Copy text';
@@ -1347,7 +1403,11 @@
         content += replyPreview.outerHTML;
       }
       
-      content += `<span class="username">${data.name}</span>${messageText}`;
+      // Only show username for other users' messages
+      if (!isSender) {
+        content += `<span class="username">${data.name}</span>`;
+      }
+      content += messageText;
       
       if (data.type === 'image') {
         content += `<br><img class="chat-image" src="${data.url}" alt="Image" loading="lazy" onclick="openLightbox('${data.url}')" />`;
@@ -1379,17 +1439,91 @@
       attachLongPressAndContext(msg, isSender, data);
     }
 
-    // Lightbox functions
+    // Lightbox functions with zoom
     window.openLightbox = function(src) {
       lightboxImage.src = src;
       lightbox.style.display = 'flex';
       document.body.style.overflow = 'hidden';
+      resetLightboxZoom();
     };
 
     window.closeLightbox = function() {
       lightbox.style.display = 'none';
       document.body.style.overflow = '';
+      resetLightboxZoom();
     };
+
+    function resetLightboxZoom() {
+      currentScale = 1;
+      lightboxImage.style.transform = `scale(${currentScale})`;
+      lightboxImage.style.cursor = 'default';
+      lightboxImage.style.maxWidth = '90vw';
+      lightboxImage.style.maxHeight = '90vh';
+    }
+
+    function zoomLightbox(factor) {
+      currentScale *= factor;
+      if (currentScale < minScale) currentScale = minScale;
+      if (currentScale > maxScale) currentScale = maxScale;
+      lightboxImage.style.transform = `scale(${currentScale})`;
+      lightboxImage.style.cursor = currentScale > 1 ? 'move' : 'default';
+    }
+
+    // Setup zoom controls
+    document.getElementById('lightbox-zoom-in').addEventListener('click', (e) => {
+      e.stopPropagation();
+      zoomLightbox(1.2);
+    });
+
+    document.getElementById('lightbox-zoom-out').addEventListener('click', (e) => {
+      e.stopPropagation();
+      zoomLightbox(0.8);
+    });
+
+    document.getElementById('lightbox-reset-zoom').addEventListener('click', (e) => {
+      e.stopPropagation();
+      resetLightboxZoom();
+    });
+
+    // Zoom with mouse wheel
+    lightboxImage.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        zoomLightbox(1.1);
+      } else {
+        zoomLightbox(0.9);
+      }
+    });
+
+    // Dragging for zoomed images
+    lightboxImage.addEventListener('mousedown', (e) => {
+      if (currentScale <= 1) return;
+      e.preventDefault();
+      isDragging = true;
+      startX = e.pageX - lightboxImage.offsetLeft;
+      startY = e.pageY - lightboxImage.offsetTop;
+      scrollLeft = lightboxImage.scrollLeft;
+      scrollTop = lightboxImage.scrollTop;
+      lightboxImage.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging || currentScale <= 1) return;
+      e.preventDefault();
+      const x = e.pageX - lightboxImage.offsetLeft;
+      const y = e.pageY - lightboxImage.offsetTop;
+      const walkX = (x - startX) * 2;
+      const walkY = (y - startY) * 2;
+      lightboxImage.scrollLeft = scrollLeft - walkX;
+      lightboxImage.scrollTop = scrollTop - walkY;
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+      if (currentScale > 1) {
+        lightboxImage.style.cursor = 'grab';
+      }
+    });
 
     // Close lightbox when clicking outside the image
     lightbox.addEventListener('click', (e) => {
@@ -1478,7 +1612,7 @@
     }
 
     function selectGif(gif) {
-      const id = Date.now().toString();
+      const id = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
       
       // Use original version for chat
       const gifUrl = gif.images.original.url;
@@ -1535,11 +1669,11 @@
       const images = richInput.querySelectorAll('img');
       
       if (textContent || images.length > 0) {
-        const id = Date.now().toString();
+        const id = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
         
         if (images.length > 0) {
           images.forEach(img => {
-            const imgId = Date.now().toString() + Math.random();
+            const imgId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
             const isGif = img.src.toLowerCase().includes('.gif') || 
                          img.dataset.type === 'gif' ||
                          img.src.includes('giphy') || 
@@ -1624,7 +1758,7 @@
         if (!response.ok) throw new Error('Upload failed');
         
         const data = await response.json();
-        const id = Date.now().toString();
+        const id = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
         
         const isGif = file.type === 'image/gif' || 
                      file.name.toLowerCase().endsWith('.gif') ||
@@ -1687,7 +1821,7 @@
             if (!response.ok) throw new Error('Upload failed');
             
             const data = await response.json();
-            const id = Date.now().toString();
+            const id = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
             const isGif = item.type === 'image/gif' || blob.type === 'image/gif';
             
             const payload = {
