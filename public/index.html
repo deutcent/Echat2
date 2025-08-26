@@ -32,6 +32,27 @@
       position: relative;
       overflow: hidden;
       border-radius: 0;
+      transition: box-shadow 0.3s ease;
+    }
+
+    /* Green border pulse animation */
+    @keyframes borderPulse {
+      0% { 
+        box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7),
+                    0 0 0 0 rgba(37, 211, 102, 0.7) inset;
+      }
+      70% { 
+        box-shadow: 0 0 0 15px rgba(37, 211, 102, 0),
+                    0 0 0 15px rgba(37, 211, 102, 0) inset;
+      }
+      100% { 
+        box-shadow: 0 0 0 0 rgba(37, 211, 102, 0),
+                    0 0 0 0 rgba(37, 211, 102, 0) inset;
+      }
+    }
+
+    .border-pulse {
+      animation: borderPulse 1.5s ease;
     }
 
     header {
@@ -44,6 +65,21 @@
       align-items: center;
       box-shadow: 0 2px 8px rgba(0,0,0,0.15);
       z-index: 100;
+    }
+
+    .hamburger {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+
+    .hamburger:hover {
+      background: rgba(255, 255, 255, 0.1);
     }
 
     #user-list {
@@ -745,6 +781,168 @@
       border: 2px solid #25d366;
     }
 
+    /* Private Rooms Sidebar */
+    #private-rooms-sidebar {
+      position: fixed;
+      top: 0;
+      right: -300px;
+      width: 300px;
+      height: 100%;
+      background: #fff;
+      box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+      transition: right 0.3s ease;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    #private-rooms-sidebar.active {
+      right: 0;
+    }
+
+    .sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e1e8ed;
+    }
+
+    .sidebar-title {
+      font-weight: 600;
+      color: #075e54;
+    }
+
+    .close-sidebar {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #8696a0;
+    }
+
+    .private-rooms-section {
+      margin-bottom: 25px;
+    }
+
+    .section-title {
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #128c7e;
+    }
+
+    .room-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .room-input {
+      padding: 10px;
+      border: 1px solid #e1e8ed;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .room-btn {
+      padding: 10px;
+      background: #25d366;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .room-btn:hover {
+      background: #128c7e;
+    }
+
+    .rooms-list {
+      margin-top: 15px;
+    }
+
+    .room-item {
+      padding: 12px;
+      background: #f0f2f5;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .room-info {
+      flex: 1;
+    }
+
+    .room-name {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .room-creator {
+      font-size: 12px;
+      color: #8696a0;
+    }
+
+    .join-room-btn {
+      background: #25d366;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .join-room-btn:hover {
+      background: #128c7e;
+    }
+
+    .current-room-indicator {
+      background: #e3f2fd;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      text-align: center;
+      font-weight: 500;
+      color: #1976d2;
+    }
+
+    .leave-room-btn {
+      background: #ff3b30;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 12px;
+      cursor: pointer;
+      margin-top: 10px;
+      width: 100%;
+    }
+
+    .leave-room-btn:hover {
+      background: #d70015;
+    }
+
+    /* Overlay for sidebar */
+    #sidebar-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 999;
+      display: none;
+    }
+
+    #sidebar-overlay.active {
+      display: block;
+    }
+
     /* Enhanced mobile responsiveness */
     @media (max-width: 600px) {
       #chat-container {
@@ -838,6 +1036,11 @@
         font-size: 20px;
         width: 36px;
         height: 36px;
+      }
+
+      #private-rooms-sidebar {
+        width: 85%;
+        right: -85%;
       }
     }
 
@@ -956,6 +1159,29 @@
       .highlighted {
         border: 2px solid #4fc3f7;
       }
+
+      #private-rooms-sidebar {
+        background: #202c33;
+        color: #e9edef;
+      }
+
+      .sidebar-header {
+        border-bottom-color: #3b4a54;
+      }
+
+      .room-input {
+        background: #2a3942;
+        border-color: #3b4a54;
+        color: #e9edef;
+      }
+
+      .room-item {
+        background: #2a3942;
+      }
+
+      .room-creator {
+        color: #8696a0;
+      }
     }
   </style>
 </head>
@@ -963,7 +1189,10 @@
   <div id="chat-container">
     <header>
       <span>💬 Echat</span>
-      <span id="online-count">Online: 0</span>
+      <div>
+        <span id="online-count">Online: 0</span>
+        <button class="hamburger" id="hamburger-btn">☰</button>
+      </div>
     </header>
     <div id="user-list">Users: Loading...</div>
     <button id="clear-chat-btn">🧹 Clear All Chat</button>
@@ -1020,6 +1249,45 @@
     </form>
   </div>
 
+  <!-- Private Rooms Sidebar -->
+  <div id="sidebar-overlay"></div>
+  <div id="private-rooms-sidebar">
+    <div class="sidebar-header">
+      <h3 class="sidebar-title">Private Rooms</h3>
+      <button class="close-sidebar" id="close-sidebar">×</button>
+    </div>
+    
+    <div id="current-room-info" class="current-room-indicator" style="display: none;">
+      You're in: <span id="current-room-name"></span>
+      <button class="leave-room-btn" id="leave-room-btn">Leave Room</button>
+    </div>
+    
+    <div class="private-rooms-section">
+      <h4 class="section-title">Create Private Room</h4>
+      <div class="room-form">
+        <input type="text" class="room-input" id="new-room-name" placeholder="Room Name">
+        <input type="password" class="room-input" id="new-room-password" placeholder="Password">
+        <button class="room-btn" id="create-room-btn">Create Room</button>
+      </div>
+    </div>
+    
+    <div class="private-rooms-section">
+      <h4 class="section-title">Join Private Room</h4>
+      <div class="room-form">
+        <input type="text" class="room-input" id="join-room-id" placeholder="Room ID">
+        <input type="password" class="room-input" id="join-room-password" placeholder="Password">
+        <button class="room-btn" id="join-room-btn">Join Room</button>
+      </div>
+    </div>
+    
+    <div class="private-rooms-section">
+      <h4 class="section-title">Active Private Rooms</h4>
+      <div id="rooms-list" class="rooms-list">
+        <!-- Rooms will be loaded here -->
+      </div>
+    </div>
+  </div>
+
   <!-- Lightbox for viewing images with zoom controls -->
   <div id="lightbox" class="lightbox" style="display: none;">
     <span class="lightbox-close" onclick="closeLightbox()">×</span>
@@ -1064,11 +1332,30 @@
     const replyContent = document.getElementById('reply-content');
     const cancelReplyBtn = document.getElementById('cancel-reply');
     
+    // Private rooms elements
+    const hamburgerBtn = document.getElementById('hamburger-btn');
+    const sidebar = document.getElementById('private-rooms-sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    const closeSidebarBtn = document.getElementById('close-sidebar');
+    const newRoomNameInput = document.getElementById('new-room-name');
+    const newRoomPasswordInput = document.getElementById('new-room-password');
+    const createRoomBtn = document.getElementById('create-room-btn');
+    const joinRoomIdInput = document.getElementById('join-room-id');
+    const joinRoomPasswordInput = document.getElementById('join-room-password');
+    const joinRoomBtn = document.getElementById('join-room-btn');
+    const roomsList = document.getElementById('rooms-list');
+    const currentRoomInfo = document.getElementById('current-room-info');
+    const currentRoomName = document.getElementById('current-room-name');
+    const leaveRoomBtn = document.getElementById('leave-room-btn');
+    
     // Store the message being replied to
     let replyingToMessage = null;
     
     // Track the last displayed date
     let lastDisplayedDate = null;
+
+    // Track current room
+    let currentRoom = null;
 
     // Lightbox zoom state
     let currentScale = 1;
@@ -1166,8 +1453,101 @@
       replyPreview.style.display = 'none';
     }
     
+    // Toggle sidebar
+    function toggleSidebar() {
+      sidebar.classList.toggle('active');
+      sidebarOverlay.classList.toggle('active');
+    }
+    
+    // Close sidebar
+    function closeSidebar() {
+      sidebar.classList.remove('active');
+      sidebarOverlay.classList.remove('active');
+    }
+    
+    // Update current room display
+    function updateCurrentRoomDisplay(room) {
+      if (room) {
+        currentRoom = room;
+        currentRoomInfo.style.display = 'block';
+        currentRoomName.textContent = room.name;
+      } else {
+        currentRoom = null;
+        currentRoomInfo.style.display = 'none';
+      }
+    }
+    
+    // Update rooms list
+    function updateRoomsList(rooms) {
+      roomsList.innerHTML = '';
+      
+      if (rooms.length === 0) {
+        roomsList.innerHTML = '<p style="text-align: center; color: #8696a0;">No active private rooms</p>';
+        return;
+      }
+      
+      rooms.forEach(room => {
+        const roomItem = document.createElement('div');
+        roomItem.className = 'room-item';
+        roomItem.innerHTML = `
+          <div class="room-info">
+            <div class="room-name">${room.name}</div>
+            <div class="room-creator">Created by: ${room.creator}</div>
+          </div>
+          <button class="join-room-btn" data-room-id="${room.id}">Join</button>
+        `;
+        roomsList.appendChild(roomItem);
+      });
+      
+      // Add event listeners to join buttons
+      document.querySelectorAll('.join-room-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const roomId = btn.getAttribute('data-room-id');
+          const password = prompt(`Enter password for room "${btn.parentElement.querySelector('.room-name').textContent}":`);
+          if (password) {
+            socket.emit('join private room', { roomId, password });
+          }
+        });
+      });
+    }
+    
     // Attach click handler to cancel reply button
     cancelReplyBtn.addEventListener('click', cancelReply);
+    
+    // Sidebar event listeners
+    hamburgerBtn.addEventListener('click', toggleSidebar);
+    closeSidebarBtn.addEventListener('click', closeSidebar);
+    sidebarOverlay.addEventListener('click', closeSidebar);
+    
+    // Private room event listeners
+    createRoomBtn.addEventListener('click', () => {
+      const roomName = newRoomNameInput.value.trim();
+      const password = newRoomPasswordInput.value.trim();
+      
+      if (!roomName || !password) {
+        alert('Please enter both room name and password');
+        return;
+      }
+      
+      socket.emit('create private room', { name: roomName, password });
+    });
+    
+    joinRoomBtn.addEventListener('click', () => {
+      const roomId = joinRoomIdInput.value.trim();
+      const password = joinRoomPasswordInput.value.trim();
+      
+      if (!roomId || !password) {
+        alert('Please enter both room ID and password');
+        return;
+      }
+      
+      socket.emit('join private room', { roomId, password });
+    });
+    
+    leaveRoomBtn.addEventListener('click', () => {
+      socket.emit('leave private room');
+      updateCurrentRoomDisplay(null);
+    });
     
     // Create palette for message actions
     function createPalette(x, y, msgData, isSender) {
@@ -1632,7 +2012,13 @@
         } : null
       };
       
-      socket.emit('chat image', payload);
+      if (currentRoom) {
+        payload.roomId = currentRoom.id;
+        socket.emit('private message', payload);
+      } else {
+        socket.emit('chat image', payload);
+      }
+      
       createMessageElement(payload, true);
       closeGifPicker();
       cancelReply();
@@ -1695,7 +2081,13 @@
               } : null
             };
             
-            socket.emit('chat image', payload);
+            if (currentRoom) {
+              payload.roomId = currentRoom.id;
+              socket.emit('private message', payload);
+            } else {
+              socket.emit('chat image', payload);
+            }
+            
             createMessageElement(payload, true);
           });
         }
@@ -1714,7 +2106,14 @@
                 : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
             } : null
           };
-          socket.emit('chat message', msg);
+          
+          if (currentRoom) {
+            msg.roomId = currentRoom.id;
+            socket.emit('private message', msg);
+          } else {
+            socket.emit('chat message', msg);
+          }
+          
           createMessageElement(msg, true);
         }
         
@@ -1782,7 +2181,13 @@
           } : null
         };
         
-        socket.emit('chat image', payload);
+        if (currentRoom) {
+          payload.roomId = currentRoom.id;
+          socket.emit('private message', payload);
+        } else {
+          socket.emit('chat image', payload);
+        }
+        
         createMessageElement(payload, true);
         
       } catch (error) {
@@ -1842,7 +2247,13 @@
               } : null
             };
             
-            socket.emit('chat image', payload);
+            if (currentRoom) {
+              payload.roomId = currentRoom.id;
+              socket.emit('private message', payload);
+            } else {
+              socket.emit('chat image', payload);
+            }
+            
             createMessageElement(payload, true);
             
           } catch (error) {
@@ -1936,6 +2347,10 @@
       if (data.name !== name) createMessageElement(data, false);
     });
 
+    socket.on('private message', data => {
+      createMessageElement(data, data.name === name);
+    });
+
     socket.on('delete message', id => {
       const msgElement = document.querySelector(`[data-id="${id}"]`);
       if (msgElement) {
@@ -1980,6 +2395,50 @@
       sys.textContent = `${user} left the chat`;
       messages.appendChild(sys);
       messages.scrollTop = messages.scrollHeight;
+    });
+
+    // Private room events
+    socket.on('private room created', (room) => {
+      alert(`Private room created! Room ID: ${room.id}`);
+      newRoomNameInput.value = '';
+      newRoomPasswordInput.value = '';
+    });
+
+    socket.on('private room joined', (room) => {
+      alert(`Joined private room: ${room.name}`);
+      joinRoomIdInput.value = '';
+      joinRoomPasswordInput.value = '';
+      updateCurrentRoomDisplay(room);
+      closeSidebar();
+      
+      // Clear messages and load private room messages
+      messages.innerHTML = '';
+      lastDisplayedDate = null;
+      socket.emit('get private messages', room.id);
+    });
+
+    socket.on('private room error', (error) => {
+      alert(error);
+    });
+
+    socket.on('private rooms list', (rooms) => {
+      updateRoomsList(rooms);
+    });
+
+    socket.on('private room left', () => {
+      updateCurrentRoomDisplay(null);
+      
+      // Clear messages and load public messages
+      messages.innerHTML = '';
+      lastDisplayedDate = null;
+      socket.emit('get previous messages');
+    });
+
+    socket.on('private messages', (messagesData) => {
+      lastDisplayedDate = null;
+      messagesData.forEach(msg => {
+        createMessageElement(msg, msg.name === name);
+      });
     });
 
     // Typing indicator
@@ -2138,6 +2597,9 @@
     socket.on('connect', () => {
       console.log('Connected to server');
       userList.textContent = 'Connected...';
+      
+      // Request private rooms list
+      socket.emit('get private rooms');
     });
 
     socket.on('disconnect', () => {
@@ -2148,7 +2610,13 @@
     socket.on('reconnect', () => {
       console.log('Reconnected to server');
       socket.emit('user joined', name);
+      
+      // Request private rooms list
+      socket.emit('get private rooms');
     });
+
+    // Request private rooms list on page load
+    socket.emit('get private rooms');
 
     // Prevent zoom on double tap
     let lastTouchEnd = 0;
@@ -2173,7 +2641,17 @@
     
     handleViewportResize();
 
-    console.log('✅ Enhanced Echat with all fixes loaded');
+    // Green border pulse effect after 5 seconds
+    setTimeout(() => {
+      const container = document.getElementById('chat-container');
+      container.classList.add('border-pulse');
+      
+      container.addEventListener('animationend', () => {
+        container.classList.remove('border-pulse');
+      }, { once: true });
+    }, 5000);
+
+    console.log('✅ Enhanced Echat with private rooms loaded');
   </script>
 </body>
 </html>
