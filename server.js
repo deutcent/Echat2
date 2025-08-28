@@ -600,4 +600,4 @@ process.on('SIGTERM', async () => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`✅ Enhanced Server with fixed private rooms running at http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`✅ echat running at http://localhost:${PORT}`));
