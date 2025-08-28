@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
-  <title>Echat</title>
+  <title>Echat - Fixed Private Rooms</title>
   <style>
     * {
       box-sizing: border-box;
@@ -141,14 +141,14 @@
       float: right;
       text-align: right;
       border: 1px solid #c1e8b8;
-      border-radius: 18px 18px 6px 18px; /* Updated border-radius */
+      border-radius: 18px 18px 6px 18px;
     }
 
     .receiver {
       background: #fff;
       float: left;
       border: 1px solid #e1e8ed;
-      border-radius: 18px 18px 18px 6px; /* Updated border-radius */
+      border-radius: 18px 18px 18px 6px;
     }
 
     .username {
@@ -201,7 +201,6 @@
       right: 0;
     }
     
-    /* Reply feature styles */
     .reply-container {
       border-left: 3px solid #128c7e;
       padding: 6px 10px;
@@ -274,7 +273,6 @@
       background: rgba(134, 150, 160, 0.1);
     }
 
-    /* Link styles */
     .message-link {
       color: #128c7e;
       text-decoration: underline;
@@ -315,7 +313,6 @@
       box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
 
-    /* Reaction popup positioning */
     .palette {
       position: absolute;
       z-index: 10000;
@@ -534,7 +531,6 @@
       box-shadow: 0 4px 12px rgba(255, 59, 48, 0.4);
     }
 
-    /* GIF Picker Styles */
     #gif-picker {
       position: absolute;
       bottom: 80px;
@@ -680,7 +676,6 @@
       50% { opacity: 1; }
     }
 
-    /* Lightbox styles */
     .lightbox {
       position: fixed;
       top: 0;
@@ -727,7 +722,6 @@
       z-index: 10;
     }
 
-    /* Lightbox controls */
     .lightbox-controls {
       position: absolute;
       bottom: 20px;
@@ -759,7 +753,6 @@
       background: rgba(255,255,255,0.2);
     }
 
-    /* Highlight animation for message replies */
     @keyframes highlight {
       0% { background-color: rgba(37, 211, 102, 0.3); }
       100% { background-color: transparent; }
@@ -769,7 +762,6 @@
       animation: highlight 1.5s ease;
     }
     
-    /* NEW: Highlight animation for message replies */
     @keyframes highlightBox {
       0% { transform: scale(1); }
       50% { transform: scale(1.05); box-shadow: 0 0 15px rgba(37, 211, 102, 0.5); }
@@ -781,7 +773,6 @@
       border: 2px solid #25d366;
     }
 
-    /* Private Rooms Sidebar */
     #private-rooms-sidebar {
       position: fixed;
       top: 0;
@@ -927,7 +918,6 @@
       background: #d70015;
     }
 
-    /* Overlay for sidebar */
     #sidebar-overlay {
       position: fixed;
       top: 0;
@@ -943,7 +933,20 @@
       display: block;
     }
 
-    /* Enhanced mobile responsiveness */
+    .room-status {
+      font-size: 12px;
+      color: #8696a0;
+      margin-top: 4px;
+    }
+
+    .room-active {
+      color: #25d366;
+    }
+
+    .room-inactive {
+      color: #8696a0;
+    }
+
     @media (max-width: 600px) {
       #chat-container {
         max-width: 100%;
@@ -1044,7 +1047,6 @@
       }
     }
 
-    /* Dark mode support */
     @media (prefers-color-scheme: dark) {
       body {
         background: #0b141a;
@@ -1182,6 +1184,11 @@
       .room-creator {
         color: #8696a0;
       }
+
+      .current-room-indicator {
+        background: #1e3a5f;
+        color: #90caf9;
+      }
     }
   </style>
 </head>
@@ -1198,7 +1205,6 @@
     <button id="clear-chat-btn">🧹 Clear All Chat</button>
     <div id="messages"></div>
     
-    <!-- Reply Preview -->
     <div id="reply-preview" style="display: none;">
       <div class="reply-preview">
         <div>
@@ -1209,7 +1215,6 @@
       </div>
     </div>
     
-    <!-- GIF Picker -->
     <div id="gif-picker">
       <div class="gif-picker-header">
         <span class="gif-picker-title">Choose a GIF</span>
@@ -1249,7 +1254,6 @@
     </form>
   </div>
 
-  <!-- Private Rooms Sidebar -->
   <div id="sidebar-overlay"></div>
   <div id="private-rooms-sidebar">
     <div class="sidebar-header">
@@ -1288,7 +1292,6 @@
     </div>
   </div>
 
-  <!-- Lightbox for viewing images with zoom controls -->
   <div id="lightbox" class="lightbox" style="display: none;">
     <span class="lightbox-close" onclick="closeLightbox()">×</span>
     <div class="lightbox-content">
@@ -1489,10 +1492,17 @@
       rooms.forEach(room => {
         const roomItem = document.createElement('div');
         roomItem.className = 'room-item';
+        
+        const isActive = room.users && room.users.length > 0;
+        const userCount = room.users ? room.users.length : 0;
+        
         roomItem.innerHTML = `
           <div class="room-info">
             <div class="room-name">${room.name}</div>
             <div class="room-creator">Created by: ${room.creator}</div>
+            <div class="room-status ${isActive ? 'room-active' : 'room-inactive'}">
+              ${isActive ? `${userCount} user(s) active` : 'Room inactive'}
+            </div>
           </div>
           <button class="join-room-btn" data-room-id="${room.id}">Join</button>
         `;
@@ -1503,7 +1513,8 @@
       document.querySelectorAll('.join-room-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const roomId = btn.getAttribute('data-room-id');
-          const password = prompt(`Enter password for room "${btn.parentElement.querySelector('.room-name').textContent}":`);
+          const roomName = btn.parentElement.querySelector('.room-name').textContent;
+          const password = prompt(`Enter password for room "${roomName}":`);
           if (password) {
             socket.emit('join private room', { roomId, password });
           }
@@ -2402,6 +2413,9 @@
       alert(`Private room created! Room ID: ${room.id}`);
       newRoomNameInput.value = '';
       newRoomPasswordInput.value = '';
+      
+      // Update rooms list
+      socket.emit('get private rooms');
     });
 
     socket.on('private room joined', (room) => {
@@ -2432,6 +2446,9 @@
       messages.innerHTML = '';
       lastDisplayedDate = null;
       socket.emit('get previous messages');
+      
+      // Update rooms list
+      socket.emit('get private rooms');
     });
 
     socket.on('private messages', (messagesData) => {
@@ -2613,6 +2630,11 @@
       
       // Request private rooms list
       socket.emit('get private rooms');
+      
+      // If we were in a room, rejoin it
+      if (currentRoom) {
+        socket.emit('join private room', { roomId: currentRoom.id, password: '' });
+      }
     });
 
     // Request private rooms list on page load
@@ -2651,7 +2673,7 @@
       }, { once: true });
     }, 5000);
 
-    console.log('✅ Enhanced Echat with private rooms loaded');
+    console.log('✅ Enhanced Echat with fixed private rooms loaded');
   </script>
 </body>
 </html>

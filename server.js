@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -18,7 +17,6 @@ mongoose.connect('mongodb+srv://swatantrakumar1582011:EcaewvoJs0wWpHRn@cluster0.
 })
   .then(() => {
     console.log('✅ MongoDB Connected');
-    // Use mongoose's underlying mongo driver GridFSBucket
     bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
   })
   .catch(err => console.error(err));
@@ -60,7 +58,7 @@ const PrivateRoom = mongoose.model('PrivateRoom', privateRoomSchema);
 // Online Users & Reactions
 let onlineUsers = new Map();
 
-// Store private rooms in memory for faster access (will also be stored in DB)
+// Store private rooms in memory for faster access
 let privateRooms = new Map();
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -132,7 +130,6 @@ app.get('/file/:fileId', (req, res) => {
 
     let sentHeader = false;
     downloadStream.on('file', (file) => {
-      // set sensible headers for download with original filename when possible
       const mimeType = (file.metadata && file.metadata.mimeType) ? file.metadata.mimeType : 'application/octet-stream';
       const originalName = (file.metadata && file.metadata.originalName) ? file.metadata.originalName : file.filename;
 
@@ -560,10 +557,7 @@ io.on('connection', socket => {
         PrivateRoom.updateOne({ id: roomId }, { users: room.users })
           .catch(err => console.error('Error updating room users:', err));
         
-        // If no users left, delete the room
-        if (room.users.length === 0) {
-          expirePrivateRoom(roomId);
-        }
+        // Don't delete the room even if empty - let it expire naturally
       }
     });
     
@@ -606,4 +600,4 @@ process.on('SIGTERM', async () => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`✅ Enhanced Server with private rooms running at http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`✅ Enhanced Server with fixed private rooms running at http://localhost:${PORT}`));
