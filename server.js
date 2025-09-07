@@ -31,6 +31,10 @@ const messageSchema = new mongoose.Schema({
   url: String,
   filename: String,
   type: String,
+  images: [{
+    url: String,
+    filename: String
+  }],
   reactions: { type: Object, default: {} },
   timestamp: { type: Date, default: Date.now },
   fileId: mongoose.Schema.Types.ObjectId,
@@ -263,12 +267,25 @@ io.on('connection', socket => {
       data.reactions = data.reactions || {};
       data.timestamp = data.timestamp || Date.now();
       
-      const isGif = data.type === 'gif' || 
-                   data.mimeType === 'image/gif' || 
-                   (data.filename && data.filename.toLowerCase().endsWith('.gif'));
-      
-      if (isGif) {
-        data.type = 'gif';
+      // Handle multiple images
+      if (data.type === 'multiple' && data.images) {
+        const isGif = data.images.some(img => 
+          img.filename.toLowerCase().endsWith('.gif') || 
+          img.url.includes('.gif')
+        );
+        
+        if (isGif) {
+          data.type = 'gif';
+        }
+      } else {
+        // Single image
+        const isGif = data.type === 'gif' || 
+                     data.mimeType === 'image/gif' || 
+                     (data.filename && data.filename.toLowerCase().endsWith('.gif'));
+        
+        if (isGif) {
+          data.type = 'gif';
+        }
       }
       
       const msg = new Message(data);
@@ -482,6 +499,7 @@ io.on('connection', socket => {
       
       // Notify all clients to clear public chat
       io.emit('clear all chat');
+      console.log('✅ All public chat cleared');
     } catch (error) {
       console.error('Error clearing chat:', error);
       socket.emit('error', { message: 'Failed to clear chat' });
@@ -509,6 +527,8 @@ io.on('connection', socket => {
       } else {
         io.emit('delete message', id);
       }
+      
+      console.log(`✅ Message ${id} deleted`);
     } catch (error) {
       console.error('Error deleting message:', error);
       socket.emit('error', { message: 'Failed to delete message' });
@@ -537,6 +557,8 @@ io.on('connection', socket => {
       } else {
         io.emit('react message', { id, reactions: message.reactions });
       }
+      
+      console.log(`✅ Reaction added to message ${id}`);
     } catch (error) {
       console.error('Error updating reaction:', error);
       socket.emit('error', { message: 'Failed to update reaction' });
@@ -570,6 +592,8 @@ io.on('connection', socket => {
     if (typingTimeout) {
       clearTimeout(typingTimeout);
     }
+    
+    console.log(`❌ User ${userName} disconnected`);
   });
 
   socket.on('error', (error) => {
@@ -606,4 +630,4 @@ process.on('SIGTERM', async () => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`✅ Enhanced Server with private rooms running at http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`✅ Enhanced Server with private rooms, share, and gallery features running at http://localhost:${PORT}`));

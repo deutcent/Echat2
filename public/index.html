@@ -943,6 +943,173 @@
       display: block;
     }
 
+    /* NEW: Image collage styles */
+    .image-collage {
+      display: grid;
+      gap: 4px;
+      margin-top: 8px;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .image-collage-1 {
+      grid-template-columns: 1fr;
+    }
+
+    .image-collage-2 {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .image-collage-3 {
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+    }
+
+    .image-collage-4 {
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+    }
+
+    .image-collage-3 .collage-item:first-child {
+      grid-column: span 2;
+    }
+
+    .collage-item {
+      position: relative;
+      cursor: pointer;
+      overflow: hidden;
+      aspect-ratio: 1;
+    }
+
+    .collage-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.2s ease;
+    }
+
+    .collage-item:hover img {
+      transform: scale(1.05);
+    }
+
+    .collage-more {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Gallery lightbox styles */
+    .gallery-lightbox {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.95);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 20000;
+      touch-action: none;
+    }
+
+    .gallery-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .gallery-slide {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .gallery-slide.active {
+      opacity: 1;
+      z-index: 10;
+    }
+
+    .gallery-image {
+      max-width: 90%;
+      max-height: 80vh;
+      object-fit: contain;
+    }
+
+    .gallery-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      border: none;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 20;
+      font-size: 24px;
+    }
+
+    .gallery-nav.prev {
+      left: 20px;
+    }
+
+    .gallery-nav.next {
+      right: 20px;
+    }
+
+    .gallery-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      color: white;
+      font-size: 40px;
+      cursor: pointer;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+
+    .gallery-counter {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: white;
+      font-size: 16px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 8px 16px;
+      border-radius: 20px;
+      z-index: 20;
+    }
+
     /* Enhanced mobile responsiveness */
     @media (max-width: 600px) {
       #chat-container {
@@ -1041,6 +1208,28 @@
       #private-rooms-sidebar {
         width: 85%;
         right: -85%;
+      }
+
+      .gallery-nav {
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+      }
+
+      .gallery-nav.prev {
+        left: 10px;
+      }
+
+      .gallery-nav.next {
+        right: 10px;
+      }
+
+      .gallery-close {
+        top: 10px;
+        right: 10px;
+        font-size: 30px;
+        width: 40px;
+        height: 40px;
       }
     }
 
@@ -1232,7 +1421,7 @@
     
     <form id="form">
       <label id="file-input-label" for="file-input" title="Upload File">📎</label>
-      <input type="file" id="file-input" accept="image/*,video/*,.gif,.pdf,.doc,.docx,.txt" />
+      <input type="file" id="file-input" accept="image/*,video/*,.gif,.pdf,.doc,.docx,.txt" multiple />
       <button type="button" id="gif-btn" title="GIF Picker">🎭</button>
       <button type="button" id="voice-btn" title="Voice Message">🎤</button>
       <div id="rich-input" 
@@ -1301,6 +1490,17 @@
     </div>
   </div>
 
+  <!-- Gallery lightbox for multiple images -->
+  <div id="gallery-lightbox" class="gallery-lightbox" style="display: none;">
+    <span class="gallery-close" onclick="closeGallery()">×</span>
+    <div class="gallery-counter" id="gallery-counter">1/1</div>
+    <button class="gallery-nav prev" onclick="navigateGallery(-1)">❮</button>
+    <button class="gallery-nav next" onclick="navigateGallery(1)">❯</button>
+    <div class="gallery-container" id="gallery-container">
+      <!-- Gallery slides will be added here -->
+    </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
@@ -1331,6 +1531,11 @@
     const replyToName = document.getElementById('reply-to-name');
     const replyContent = document.getElementById('reply-content');
     const cancelReplyBtn = document.getElementById('cancel-reply');
+    
+    // Gallery elements
+    const galleryLightbox = document.getElementById('gallery-lightbox');
+    const galleryContainer = document.getElementById('gallery-container');
+    const galleryCounter = document.getElementById('gallery-counter');
     
     // Private rooms elements
     const hamburgerBtn = document.getElementById('hamburger-btn');
@@ -1363,6 +1568,10 @@
     let maxScale = 4;
     let isDragging = false;
     let startX, startY, scrollLeft, scrollTop;
+
+    // Gallery state
+    let currentGalleryImages = [];
+    let currentGalleryIndex = 0;
 
     // Enhanced input setup
     richInput.setAttribute('contenteditable', 'true');
@@ -1511,6 +1720,194 @@
       });
     }
     
+    // NEW: Share message using Web Share API or fallback to clipboard
+    function shareMessage(msgData) {
+      let shareData = {
+        title: 'Message from Echat',
+        text: ''
+      };
+      
+      // Prepare share content based on message type
+      if (msgData.message) {
+        shareData.text = msgData.message;
+      } else if (msgData.url) {
+        shareData.text = msgData.filename || 'Shared from Echat';
+        shareData.url = msgData.url;
+      }
+      
+      // Use Web Share API if available
+      if (navigator.share) {
+        navigator.share(shareData)
+          .then(() => console.log('Shared successfully'))
+          .catch(err => {
+            console.error('Error sharing:', err);
+            // Fallback to clipboard
+            copyToClipboard(shareData.text + (shareData.url ? '\n' + shareData.url : ''));
+          });
+      } else {
+        // Fallback to clipboard
+        copyToClipboard(shareData.text + (shareData.url ? '\n' + shareData.url : ''));
+      }
+    }
+    
+    // NEW: Copy text to clipboard with notification
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text)
+        .then(() => {
+          // Show notification
+          const notification = document.createElement('div');
+          notification.className = 'system';
+          notification.textContent = 'Copied to clipboard!';
+          notification.style.position = 'fixed';
+          notification.style.bottom = '20px';
+          notification.style.left = '50%';
+          notification.style.transform = 'translateX(-50%)';
+          notification.style.padding = '10px 20px';
+          notification.style.borderRadius = '20px';
+          notification.style.backgroundColor = '#25d366';
+          notification.style.color = 'white';
+          notification.style.zIndex = '10000';
+          document.body.appendChild(notification);
+          
+          setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transition = 'opacity 0.5s';
+            setTimeout(() => notification.remove(), 500);
+          }, 2000);
+        })
+        .catch(err => {
+          console.error('Failed to copy:', err);
+          alert('Failed to copy to clipboard');
+        });
+    }
+    
+    // NEW: Create image collage for multiple images
+    function createImageCollage(images) {
+      if (!images || images.length === 0) return '';
+      
+      const collage = document.createElement('div');
+      let collageClass = 'image-collage';
+      
+      // Determine grid layout based on number of images
+      if (images.length === 1) {
+        collageClass += ' image-collage-1';
+      } else if (images.length === 2) {
+        collageClass += ' image-collage-2';
+      } else if (images.length === 3) {
+        collageClass += ' image-collage-3';
+      } else {
+        collageClass += ' image-collage-4';
+      }
+      
+      collage.className = collageClass;
+      
+      // Add images to collage (show max 4 with +X indicator)
+      const maxDisplay = 4;
+      const displayCount = Math.min(images.length, maxDisplay);
+      
+      for (let i = 0; i < displayCount; i++) {
+        const item = document.createElement('div');
+        item.className = 'collage-item';
+        item.innerHTML = `<img src="${images[i].url}" alt="Image ${i+1}" loading="lazy">`;
+        item.addEventListener('click', () => openGallery(images, i));
+        collage.appendChild(item);
+      }
+      
+      // Add +X indicator if there are more than 4 images
+      if (images.length > maxDisplay) {
+        const lastItem = collage.lastChild;
+        const moreIndicator = document.createElement('div');
+        moreIndicator.className = 'collage-more';
+        moreIndicator.textContent = `+${images.length - maxDisplay + 1}`;
+        lastItem.appendChild(moreIndicator);
+      }
+      
+      return collage.outerHTML;
+    }
+    
+    // NEW: Open gallery with multiple images
+    function openGallery(images, startIndex = 0) {
+      currentGalleryImages = images;
+      currentGalleryIndex = startIndex;
+      
+      // Clear previous slides
+      galleryContainer.innerHTML = '';
+      
+      // Create slides for each image
+      images.forEach((image, index) => {
+        const slide = document.createElement('div');
+        slide.className = `gallery-slide ${index === startIndex ? 'active' : ''}`;
+        slide.innerHTML = `<img class="gallery-image" src="${image.url}" alt="Image ${index+1}">`;
+        galleryContainer.appendChild(slide);
+      });
+      
+      // Update counter
+      updateGalleryCounter();
+      
+      // Show gallery
+      galleryLightbox.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      
+      // Add touch events for mobile swipe
+      let touchStartX = 0;
+      let touchEndX = 0;
+      
+      galleryContainer.addEventListener('touchstart', e => {
+        touchStartX = e.changedTouches[0].screenX;
+      }, { passive: true });
+      
+      galleryContainer.addEventListener('touchend', e => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+      }, { passive: true });
+    }
+    
+    // NEW: Handle swipe for gallery navigation
+    function handleSwipe() {
+      const swipeThreshold = 50;
+      
+      if (touchEndX < touchStartX - swipeThreshold) {
+        // Swipe left - next image
+        navigateGallery(1);
+      } else if (touchEndX > touchStartX + swipeThreshold) {
+        // Swipe right - previous image
+        navigateGallery(-1);
+      }
+    }
+    
+    // NEW: Navigate gallery
+    function navigateGallery(direction) {
+      currentGalleryIndex += direction;
+      
+      // Loop around if at ends
+      if (currentGalleryIndex < 0) {
+        currentGalleryIndex = currentGalleryImages.length - 1;
+      } else if (currentGalleryIndex >= currentGalleryImages.length) {
+        currentGalleryIndex = 0;
+      }
+      
+      // Update active slide
+      document.querySelectorAll('.gallery-slide').forEach((slide, index) => {
+        slide.classList.toggle('active', index === currentGalleryIndex);
+      });
+      
+      // Update counter
+      updateGalleryCounter();
+    }
+    
+    // NEW: Update gallery counter
+    function updateGalleryCounter() {
+      galleryCounter.textContent = `${currentGalleryIndex + 1}/${currentGalleryImages.length}`;
+    }
+    
+    // NEW: Close gallery
+    function closeGallery() {
+      galleryLightbox.style.display = 'none';
+      document.body.style.overflow = '';
+      currentGalleryImages = [];
+      currentGalleryIndex = 0;
+    }
+    
     // Attach click handler to cancel reply button
     cancelReplyBtn.addEventListener('click', cancelReply);
     
@@ -1557,6 +1954,17 @@
       const palette = document.createElement('div');
       palette.className = 'palette';
       
+      // NEW: Add share button
+      const shareBtn = document.createElement('button');
+      shareBtn.textContent = '📤';
+      shareBtn.title = 'Share message';
+      shareBtn.onclick = (e) => {
+        e.stopPropagation();
+        shareMessage(msgData);
+        palette.remove();
+      };
+      palette.appendChild(shareBtn);
+      
       // Add reply button
       const replyBtn = document.createElement('button');
       replyBtn.textContent = '↩️';
@@ -1584,26 +1992,7 @@
           }
         }
         
-        navigator.clipboard.writeText(textToCopy)
-          .then(() => {
-            const notification = document.createElement('div');
-            notification.className = 'system';
-            notification.textContent = 'Copied to clipboard!';
-            notification.style.position = 'fixed';
-            notification.style.bottom = '20px';
-            notification.style.left = '50%';
-            notification.style.transform = 'translateX(-50%)';
-            notification.style.padding = '10px 20px';
-            notification.style.borderRadius = '20px';
-            notification.style.backgroundColor = '#25d366';
-            notification.style.color = 'white';
-            notification.style.zIndex = '10000';
-            notification.style.animation = 'fadeOut 2s forwards';
-            document.body.appendChild(notification);
-            setTimeout(() => notification.remove(), 2000);
-          })
-          .catch(err => console.error('Copy failed:', err));
-        
+        copyToClipboard(textToCopy);
         palette.remove();
       };
       palette.appendChild(copyBtn);
@@ -1789,7 +2178,11 @@
       }
       content += messageText;
       
-      if (data.type === 'image') {
+      // NEW: Handle multiple images with collage
+      if (data.type === 'multiple' && data.images && data.images.length > 0) {
+        content += createImageCollage(data.images);
+        content += `<br><a class="download-link" href="${data.images[0].url}" download>⬇️ Download Images</a>`;
+      } else if (data.type === 'image') {
         content += `<br><img class="chat-image" src="${data.url}" alt="Image" loading="lazy" onclick="openLightbox('${data.url}')" />`;
         content += `<br><a class="download-link" href="${data.url}" download>⬇️ Download Image</a>`;
       } else if (data.type === 'gif') {
@@ -1916,6 +2309,18 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && lightbox.style.display === 'flex') {
         closeLightbox();
+      }
+      // NEW: Also close gallery with ESC
+      if (e.key === 'Escape' && galleryLightbox.style.display === 'flex') {
+        closeGallery();
+      }
+      // NEW: Navigate gallery with arrow keys
+      if (galleryLightbox.style.display === 'flex') {
+        if (e.key === 'ArrowLeft') {
+          navigateGallery(-1);
+        } else if (e.key === 'ArrowRight') {
+          navigateGallery(1);
+        }
       }
     });
 
@@ -2058,20 +2463,22 @@
         const id = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
         
         if (images.length > 0) {
-          images.forEach(img => {
-            const imgId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-            const isGif = img.src.toLowerCase().includes('.gif') || 
-                         img.dataset.type === 'gif' ||
-                         img.src.includes('giphy') || 
-                         img.src.includes('tenor');
+          // NEW: Handle multiple images in one message
+          if (images.length > 1) {
+            const imageUrls = [];
+            images.forEach(img => {
+              imageUrls.push({
+                url: img.src,
+                filename: img.alt || 'pasted-image'
+              });
+            });
             
             const payload = { 
-              id: imgId, 
+              id, 
               name, 
-              url: img.src, 
-              filename: img.alt || 'pasted-image', 
+              images: imageUrls, 
               timestamp: Date.now(),
-              type: isGif ? 'gif' : 'image',
+              type: 'multiple',
               replyTo: replyingToMessage ? {
                 id: replyingToMessage.id,
                 name: replyingToMessage.name,
@@ -2089,7 +2496,41 @@
             }
             
             createMessageElement(payload, true);
-          });
+          } else {
+            // Single image
+            images.forEach(img => {
+              const imgId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+              const isGif = img.src.toLowerCase().includes('.gif') || 
+                           img.dataset.type === 'gif' ||
+                           img.src.includes('giphy') || 
+                           img.src.includes('tenor');
+              
+              const payload = { 
+                id: imgId, 
+                name, 
+                url: img.src, 
+                filename: img.alt || 'pasted-image', 
+                timestamp: Date.now(),
+                type: isGif ? 'gif' : 'image',
+                replyTo: replyingToMessage ? {
+                  id: replyingToMessage.id,
+                  name: replyingToMessage.name,
+                  preview: replyingToMessage.message 
+                    ? replyingToMessage.message.substring(0, 50) 
+                    : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
+                } : null
+              };
+              
+              if (currentRoom) {
+                payload.roomId = currentRoom.id;
+                socket.emit('private message', payload);
+              } else {
+                socket.emit('chat image', payload);
+              }
+              
+              createMessageElement(payload, true);
+            });
+          }
         }
         
         if (textContent) {
@@ -2139,56 +2580,111 @@
 
     // File input handler
     fileInput.addEventListener('change', async () => {
-      const file = fileInput.files[0];
-      if (!file) return;
+      const files = Array.from(fileInput.files);
+      if (!files.length) return;
       
       const submitBtn = document.querySelector('button[type="submit"]');
       submitBtn.classList.add('loading');
       
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        const response = await fetch('/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        
-        if (!response.ok) throw new Error('Upload failed');
-        
-        const data = await response.json();
-        const id = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
-        
-        const isGif = file.type === 'image/gif' || 
-                     file.name.toLowerCase().endsWith('.gif') ||
-                     data.mimeType === 'image/gif';
-        
-        const payload = { 
-          id, 
-          name, 
-          url: data.fileUrl, 
-          filename: file.name, 
-          timestamp: Date.now(),
-          type: isGif ? 'gif' : (file.type.startsWith('image/') ? 'image' : 'file'),
-          fileId: data.fileId,
-          mimeType: data.mimeType,
-          replyTo: replyingToMessage ? {
-            id: replyingToMessage.id,
-            name: replyingToMessage.name,
-            preview: replyingToMessage.message 
-              ? replyingToMessage.message.substring(0, 50) 
-              : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
-          } : null
-        };
-        
-        if (currentRoom) {
-          payload.roomId = currentRoom.id;
-          socket.emit('private message', payload);
+        // NEW: Handle multiple files
+        if (files.length > 1) {
+          const imageUrls = [];
+          
+          for (const file of files) {
+            if (!file.type.startsWith('image/')) continue;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const response = await fetch('/upload', {
+              method: 'POST',
+              body: formData,
+            });
+            
+            if (!response.ok) throw new Error('Upload failed');
+            
+            const data = await response.json();
+            imageUrls.push({
+              url: data.fileUrl,
+              filename: file.name
+            });
+          }
+          
+          if (imageUrls.length > 0) {
+            const id = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
+            
+            const payload = { 
+              id, 
+              name, 
+              images: imageUrls, 
+              timestamp: Date.now(),
+              type: 'multiple',
+              replyTo: replyingToMessage ? {
+                id: replyingToMessage.id,
+                name: replyingToMessage.name,
+                preview: replyingToMessage.message 
+                  ? replyingToMessage.message.substring(0, 50) 
+                  : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
+              } : null
+            };
+            
+            if (currentRoom) {
+              payload.roomId = currentRoom.id;
+              socket.emit('private message', payload);
+            } else {
+              socket.emit('chat image', payload);
+            }
+            
+            createMessageElement(payload, true);
+          }
         } else {
-          socket.emit('chat image', payload);
+          // Single file
+          const file = files[0];
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          const response = await fetch('/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (!response.ok) throw new Error('Upload failed');
+          
+          const data = await response.json();
+          const id = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
+          
+          const isGif = file.type === 'image/gif' || 
+                       file.name.toLowerCase().endsWith('.gif') ||
+                       data.mimeType === 'image/gif';
+          
+          const payload = { 
+            id, 
+            name, 
+            url: data.fileUrl, 
+            filename: file.name, 
+            timestamp: Date.now(),
+            type: isGif ? 'gif' : (file.type.startsWith('image/') ? 'image' : 'file'),
+            fileId: data.fileId,
+            mimeType: data.mimeType,
+            replyTo: replyingToMessage ? {
+              id: replyingToMessage.id,
+              name: replyingToMessage.name,
+              preview: replyingToMessage.message 
+                ? replyingToMessage.message.substring(0, 50) 
+                : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
+            } : null
+          };
+          
+          if (currentRoom) {
+            payload.roomId = currentRoom.id;
+            socket.emit('private message', payload);
+          } else {
+            socket.emit('chat image', payload);
+          }
+          
+          createMessageElement(payload, true);
         }
-        
-        createMessageElement(payload, true);
         
       } catch (error) {
         console.error('Upload failed:', error);
@@ -2651,7 +3147,7 @@
       }, { once: true });
     }, 5000);
 
-    console.log('✅ Enhanced Echat with private rooms loaded');
+    console.log('✅ Enhanced Echat with private rooms, share, and gallery features loaded');
   </script>
 </body>
 </html>
