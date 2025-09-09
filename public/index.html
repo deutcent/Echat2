@@ -696,9 +696,9 @@
     }
 
     .lightbox-content {
+      position: relative;
       max-width: 90%;
       max-height: 90%;
-      position: relative;
     }
 
     .lightbox-image {
@@ -1809,7 +1809,12 @@
         const item = document.createElement('div');
         item.className = 'collage-item';
         item.innerHTML = `<img src="${images[i].url}" alt="Image ${i+1}" loading="lazy">`;
-        item.addEventListener('click', () => openGallery(images, i));
+        // Store the index and images array for gallery navigation
+        item.dataset.index = i;
+        item.addEventListener('click', () => {
+          // Pass the entire images array and the clicked index to the gallery
+          openGallery(images, i);
+        });
         collage.appendChild(item);
       }
       
@@ -1819,6 +1824,11 @@
         const moreIndicator = document.createElement('div');
         moreIndicator.className = 'collage-more';
         moreIndicator.textContent = `+${images.length - maxDisplay + 1}`;
+        // Clicking the "+X" indicator should open the gallery at the first hidden image
+        moreIndicator.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openGallery(images, maxDisplay - 1);
+        });
         lastItem.appendChild(moreIndicator);
       }
       
