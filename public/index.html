@@ -151,6 +151,18 @@
       border-radius: 18px 18px 18px 6px; /* Updated border-radius */
     }
 
+    .ai-message {
+      background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+      float: left;
+      border: 1px solid #bbdefb;
+      border-radius: 18px 18px 18px 6px;
+    }
+
+    .ai-message .username {
+      color: #0d47a1;
+      font-weight: 700;
+    }
+
     .username {
       font-weight: 600;
       color: #075e54;
@@ -168,37 +180,32 @@
       text-align: right;
     }
 
+    /* NEW: WhatsApp-style date separator */
     .date-header {
       text-align: center;
-      color: #8696a0;
-      font-size: 0.85rem;
+      color: #667781;
+      font-size: 0.75rem;
       font-weight: 500;
       margin: 16px 0;
-      padding: 8px;
+      position: relative;
       z-index: 1;
-      background: rgba(236, 229, 221, 0.95);
-      border-radius: 20px;
-      max-width: 200px;
-      margin-left: auto;
-      margin-right: auto;
     }
 
-    .date-header::before,
-    .date-header::after {
-      content: "";
-      position: absolute;
-      top: 50%;
-      width: 30%;
-      height: 1px;
-      background: rgba(134, 150, 160, 0.3);
+    .date-header span {
+      background: rgba(225, 225, 225, 0.9);
+      padding: 4px 12px;
+      border-radius: 15px;
     }
 
     .date-header::before {
+      content: "";
+      position: absolute;
+      top: 50%;
       left: 0;
-    }
-
-    .date-header::after {
       right: 0;
+      height: 1px;
+      background: rgba(134, 150, 160, 0.3);
+      z-index: -1;
     }
     
     /* Reply feature styles */
@@ -680,7 +687,7 @@
       50% { opacity: 1; }
     }
 
-    /* Lightbox styles */
+    /* Lightbox styles - Updated for WhatsApp-like fullscreen */
     .lightbox {
       position: fixed;
       top: 0;
@@ -693,19 +700,24 @@
       align-items: center;
       z-index: 20000;
       cursor: pointer;
+      touch-action: manipulation;
     }
 
     .lightbox-content {
       position: relative;
-      max-width: 90%;
-      max-height: 90%;
+      max-width: 100%;
+      max-height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
     }
 
     .lightbox-image {
       max-width: 100%;
-      max-height: 80vh;
+      max-height: 100%;
       object-fit: contain;
-      border-radius: 8px;
       transition: transform 0.2s ease;
       transform-origin: center center;
     }
@@ -761,24 +773,12 @@
 
     /* Highlight animation for message replies */
     @keyframes highlight {
-      0% { background-color: rgba(37, 211, 102, 0.3); }
+      0% { background-color: rgba(255, 235, 59, 0.8); }
       100% { background-color: transparent; }
     }
 
     .highlighted {
-      animation: highlight 1.5s ease;
-    }
-    
-    /* NEW: Highlight animation for message replies */
-    @keyframes highlightBox {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.05); box-shadow: 0 0 15px rgba(37, 211, 102, 0.5); }
-      100% { transform: scale(1); }
-    }
-
-    .highlighted {
-      animation: highlightBox 1s ease;
-      border: 2px solid #25d366;
+      animation: highlight 2s ease;
     }
 
     /* Private Rooms Sidebar */
@@ -943,7 +943,7 @@
       display: block;
     }
 
-    /* NEW: Image collage styles */
+    /* Image collage styles */
     .image-collage {
       display: grid;
       gap: 4px;
@@ -1189,9 +1189,7 @@
       }
       
       .date-header {
-        font-size: 0.75rem;
-        padding: 6px;
-        max-width: 180px;
+        font-size: 0.7rem;
       }
       
       .lightbox-controls {
@@ -1264,6 +1262,12 @@
         border-color: #005c4b;
         color: #e9edef;
       }
+
+      .ai-message {
+        background: linear-gradient(135deg, #1e3a5f 0%, #2a5298 100%);
+        border-color: #2a5298;
+        color: #e9edef;
+      }
       
       .system {
         background: rgba(32, 44, 51, 0.6);
@@ -1326,13 +1330,12 @@
         color: #aebac1;
       }
       
-      .date-header {
+      .date-header span {
+        background: rgba(32, 44, 51, 0.9);
         color: #aebac1;
-        background: rgba(11, 20, 26, 0.95);
       }
       
-      .date-header::before,
-      .date-header::after {
+      .date-header::before {
         background: rgba(174, 186, 193, 0.3);
       }
       
@@ -1346,7 +1349,7 @@
       }
       
       .highlighted {
-        border: 2px solid #4fc3f7;
+        animation: highlight 2s ease;
       }
 
       #private-rooms-sidebar {
@@ -1624,7 +1627,7 @@
 
       const header = document.createElement('div');
       header.className = 'date-header';
-      header.textContent = dateStr;
+      header.innerHTML = `<span>${dateStr}</span>`;
       messages.appendChild(header);
 
       lastDisplayedDate = dateStr;
@@ -1720,7 +1723,7 @@
       });
     }
     
-    // NEW: Share message using Web Share API or fallback to clipboard
+    // Share message using Web Share API or fallback to clipboard
     function shareMessage(msgData) {
       let shareData = {
         title: 'Message from Echat',
@@ -1750,7 +1753,7 @@
       }
     }
     
-    // NEW: Copy text to clipboard with notification
+    // Copy text to clipboard with notification
     function copyToClipboard(text) {
       navigator.clipboard.writeText(text)
         .then(() => {
@@ -1781,7 +1784,7 @@
         });
     }
     
-    // NEW: Create image collage for multiple images
+    // Create image collage for multiple images
     function createImageCollage(images) {
       if (!images || images.length === 0) return '';
       
@@ -1835,7 +1838,7 @@
       return collage.outerHTML;
     }
     
-    // NEW: Open gallery with multiple images
+    // Open gallery with multiple images
     function openGallery(images, startIndex = 0) {
       currentGalleryImages = images;
       currentGalleryIndex = startIndex;
@@ -1872,7 +1875,7 @@
       }, { passive: true });
     }
     
-    // NEW: Handle swipe for gallery navigation
+    // Handle swipe for gallery navigation
     function handleSwipe() {
       const swipeThreshold = 50;
       
@@ -1885,7 +1888,7 @@
       }
     }
     
-    // NEW: Navigate gallery
+    // Navigate gallery
     function navigateGallery(direction) {
       currentGalleryIndex += direction;
       
@@ -1905,12 +1908,12 @@
       updateGalleryCounter();
     }
     
-    // NEW: Update gallery counter
+    // Update gallery counter
     function updateGalleryCounter() {
       galleryCounter.textContent = `${currentGalleryIndex + 1}/${currentGalleryImages.length}`;
     }
     
-    // NEW: Close gallery
+    // Close gallery
     function closeGallery() {
       galleryLightbox.style.display = 'none';
       document.body.style.overflow = '';
@@ -1964,7 +1967,7 @@
       const palette = document.createElement('div');
       palette.className = 'palette';
       
-      // NEW: Add share button
+      // Add share button
       const shareBtn = document.createElement('button');
       shareBtn.textContent = '📤';
       shareBtn.title = 'Share message';
@@ -2147,7 +2150,7 @@
       showDateHeaderIfNeeded(data.timestamp);
       
       const msg = document.createElement('div');
-      msg.className = 'message ' + (isSender ? 'sender' : 'receiver');
+      msg.className = 'message ' + (isSender ? 'sender' : data.name === '🤖 Echat AI' ? 'ai-message' : 'receiver');
       msg.dataset.id = data.id;
       
       // Store message data for later use
@@ -2176,7 +2179,7 @@
           if (originalMsg) {
             originalMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
             originalMsg.classList.add('highlighted');
-            setTimeout(() => originalMsg.classList.remove('highlighted'), 1500);
+            setTimeout(() => originalMsg.classList.remove('highlighted'), 2000);
           }
         });
         content += replyPreview.outerHTML;
@@ -2188,7 +2191,7 @@
       }
       content += messageText;
       
-      // NEW: Handle multiple images with collage
+      // Handle multiple images with collage
       if (data.type === 'multiple' && data.images && data.images.length > 0) {
         content += createImageCollage(data.images);
         content += `<br><a class="download-link" href="${data.images[0].url}" download>⬇️ Download Images</a>`;
@@ -2219,7 +2222,10 @@
         messages.scrollTop = messages.scrollHeight;
       });
 
-      attachLongPressAndContext(msg, isSender, data);
+      // Don't add context menu for AI messages
+      if (data.name !== '🤖 Echat AI') {
+        attachLongPressAndContext(msg, isSender, data);
+      }
     }
 
     // Lightbox functions with zoom
@@ -2320,11 +2326,11 @@
       if (e.key === 'Escape' && lightbox.style.display === 'flex') {
         closeLightbox();
       }
-      // NEW: Also close gallery with ESC
+      // Also close gallery with ESC
       if (e.key === 'Escape' && galleryLightbox.style.display === 'flex') {
         closeGallery();
       }
-      // NEW: Navigate gallery with arrow keys
+      // Navigate gallery with arrow keys
       if (galleryLightbox.style.display === 'flex') {
         if (e.key === 'ArrowLeft') {
           navigateGallery(-1);
@@ -2472,8 +2478,17 @@
       if (textContent || images.length > 0) {
         const id = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
         
+        // Check if this is an AI query
+        if (textContent.toLowerCase().startsWith('echat')) {
+          const query = textContent.substring(5).trim();
+          if (query) {
+            // Send to Gemini AI
+            socket.emit('ai query', { query, id, name });
+          }
+        }
+        
         if (images.length > 0) {
-          // NEW: Handle multiple images in one message
+          // Handle multiple images in one message
           if (images.length > 1) {
             const imageUrls = [];
             images.forEach(img => {
@@ -2543,7 +2558,7 @@
           }
         }
         
-        if (textContent) {
+        if (textContent && !textContent.toLowerCase().startsWith('echat')) {
           const msg = { 
             id, 
             name, 
@@ -2597,7 +2612,7 @@
       submitBtn.classList.add('loading');
       
       try {
-        // NEW: Handle multiple files
+        // Handle multiple files
         if (files.length > 1) {
           const imageUrls = [];
           
@@ -2641,11 +2656,9 @@
             
             if (currentRoom) {
               payload.roomId = currentRoom.id;
-              socket.emit('private message', payload);
-            } else {
-              socket.emit('chat image', payload);
             }
             
+            socket.emit('chat image', payload);
             createMessageElement(payload, true);
           }
         } else {
@@ -2855,6 +2868,10 @@
 
     socket.on('private message', data => {
       createMessageElement(data, data.name === name);
+    });
+
+    socket.on('ai response', data => {
+      createMessageElement(data, false);
     });
 
     socket.on('delete message', id => {
@@ -3157,7 +3174,7 @@
       }, { once: true });
     }, 5000);
 
-    console.log('✅ Enhanced Echat with private rooms, share, and gallery features loaded');
+    console.log('✅ Enhanced Echat with Gemini AI and new features loaded');
   </script>
 </body>
 </html>

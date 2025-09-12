@@ -11,6 +11,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "express": "^5.1.0",
     "mongoose": "^8.17.0",
     "multer": "^2.0.2",

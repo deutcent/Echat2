@@ -4,10 +4,14 @@ const socketIo = require('socket.io');
 const path = require('path');
 const multer = require('multer');
 const mongoose = require('mongoose');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
+
+// Initialize Gemini AI
+const genAI = new GoogleGenerativeAI("AIzaSyDVF2JHZcNQEWLCmjEPrXI5n2WRcnTpEQU");
 
 // MongoDB Connection with GridFS
 let bucket;
@@ -205,6 +209,26 @@ function generateRoomId() {
   return Math.random().toString(36).substring(2, 10);
 }
 
+// Generate AI response using Gemini
+async function generateAIResponse(query) {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    const prompt = `You are a helpful AI assistant in a chat app called Echat. 
+    Respond to the user's query in a friendly, conversational manner. 
+    Keep your response concise and under 200 words.
+    
+    User query: ${query}`;
+    
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
+  } catch (error) {
+    console.error('Error generating AI response:', error);
+    return "Sorry, I'm having trouble processing your request right now. Please try again later.";
+  }
+}
+
 // Socket.IO Logic
 io.on('connection', socket => {
   let userName = '';
@@ -249,6 +273,29 @@ io.on('connection', socket => {
     } catch (error) {
       console.error('Error saving message:', error);
       socket.emit('error', { message: 'Failed to save message' });
+    }
+  });
+
+  socket.on('ai query', async (data) => {
+    try {
+      const aiResponse = await generateAIResponse(data.query);
+      
+      const responseData = {
+        id: data.id,
+        name: '🤖 Echat AI',
+        message: aiResponse,
+        timestamp: Date.now()
+      };
+      
+      const msg = new Message(responseData);
+      await msg.save();
+      
+      // Send AI response to everyone in the room
+      socket.emit('ai response', responseData);
+      socket.broadcast.emit('ai response', responseData);
+    } catch (error) {
+      console.error('Error processing AI query:', error);
+      socket.emit('error', { message: 'Failed to process AI query' });
     }
   });
 
@@ -605,4 +652,4 @@ process.on('SIGTERM', async () => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`✅ Enhanced Server with private rooms running at http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`✅ Enhanced Server with Gemini AI running at http://localhost:${PORT}`));
