@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -141,14 +141,14 @@
       float: right;
       text-align: right;
       border: 1px solid #c1e8b8;
-      border-radius: 18px 18px 6px 18px; /* Updated border-radius */
+      border-radius: 18px 18px 6px 18px;
     }
 
     .receiver {
       background: #fff;
       float: left;
       border: 1px solid #e1e8ed;
-      border-radius: 18px 18px 18px 6px; /* Updated border-radius */
+      border-radius: 18px 18px 18px 6px;
     }
 
     .ai-message {
@@ -180,7 +180,6 @@
       text-align: right;
     }
 
-    /* NEW: WhatsApp-style date separator */
     .date-header {
       text-align: center;
       color: #667781;
@@ -695,7 +694,7 @@
       width: 100%;
       height: 100%;
       background: rgba(0,0,0,0.95);
-      display: flex;
+      display: none;
       justify-content: center;
       align-items: center;
       z-index: 20000;
@@ -943,7 +942,7 @@
       display: block;
     }
 
-    /* Image collage styles */
+    /* Image collage styles - FIXED for fullscreen */
     .image-collage {
       display: grid;
       gap: 4px;
@@ -1007,7 +1006,7 @@
       font-weight: bold;
     }
 
-    /* Gallery lightbox styles */
+    /* Gallery lightbox styles - FIXED for fullscreen */
     .gallery-lightbox {
       position: fixed;
       top: 0;
@@ -1015,7 +1014,7 @@
       width: 100%;
       height: 100%;
       background: rgba(0, 0, 0, 0.95);
-      display: flex;
+      display: none;
       justify-content: center;
       align-items: center;
       z-index: 20000;
@@ -1042,17 +1041,20 @@
       justify-content: center;
       opacity: 0;
       transition: opacity 0.3s ease;
+      pointer-events: none;
     }
 
     .gallery-slide.active {
       opacity: 1;
       z-index: 10;
+      pointer-events: auto;
     }
 
     .gallery-image {
-      max-width: 90%;
-      max-height: 80vh;
+      max-width: 100%;
+      max-height: 100%;
       object-fit: contain;
+      cursor: pointer;
     }
 
     .gallery-nav {
@@ -1493,7 +1495,7 @@
     </div>
   </div>
 
-  <!-- Gallery lightbox for multiple images -->
+  <!-- Gallery lightbox for multiple images - FIXED -->
   <div id="gallery-lightbox" class="gallery-lightbox" style="display: none;">
     <span class="gallery-close" onclick="closeGallery()">×</span>
     <div class="gallery-counter" id="gallery-counter">1/1</div>
@@ -1683,9 +1685,17 @@
         currentRoom = room;
         currentRoomInfo.style.display = 'block';
         currentRoomName.textContent = room.name;
+        
+        // Store room in localStorage for persistence
+        localStorage.setItem('currentRoom', JSON.stringify({
+          id: room.id,
+          name: room.name,
+          password: room.password
+        }));
       } else {
         currentRoom = null;
         currentRoomInfo.style.display = 'none';
+        localStorage.removeItem('currentRoom');
       }
     }
     
@@ -1784,7 +1794,7 @@
         });
     }
     
-    // Create image collage for multiple images
+    // Create image collage for multiple images - FIXED
     function createImageCollage(images) {
       if (!images || images.length === 0) return '';
       
@@ -1811,10 +1821,19 @@
       for (let i = 0; i < displayCount; i++) {
         const item = document.createElement('div');
         item.className = 'collage-item';
-        item.innerHTML = `<img src="${images[i].url}" alt="Image ${i+1}" loading="lazy">`;
+        
+        // Create image element with proper attributes
+        const img = document.createElement('img');
+        img.src = images[i].url;
+        img.alt = `Image ${i+1}`;
+        img.loading = 'lazy';
+        
+        item.appendChild(img);
+        
         // Store the index and images array for gallery navigation
         item.dataset.index = i;
-        item.addEventListener('click', () => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
           // Pass the entire images array and the clicked index to the gallery
           openGallery(images, i);
         });
@@ -1835,11 +1854,13 @@
         lastItem.appendChild(moreIndicator);
       }
       
-      return collage.outerHTML;
+      return collage;
     }
     
-    // Open gallery with multiple images
+    // Open gallery with multiple images - FIXED
     function openGallery(images, startIndex = 0) {
+      if (!images || images.length === 0) return;
+      
       currentGalleryImages = images;
       currentGalleryIndex = startIndex;
       
@@ -1850,7 +1871,19 @@
       images.forEach((image, index) => {
         const slide = document.createElement('div');
         slide.className = `gallery-slide ${index === startIndex ? 'active' : ''}`;
-        slide.innerHTML = `<img class="gallery-image" src="${image.url}" alt="Image ${index+1}">`;
+        
+        const img = document.createElement('img');
+        img.className = 'gallery-image';
+        img.src = image.url;
+        img.alt = `Image ${index+1}`;
+        
+        // Add click to close functionality
+        img.addEventListener('click', (e) => {
+          e.stopPropagation();
+          closeGallery();
+        });
+        
+        slide.appendChild(img);
         galleryContainer.appendChild(slide);
       });
       
@@ -1865,14 +1898,21 @@
       let touchStartX = 0;
       let touchEndX = 0;
       
-      galleryContainer.addEventListener('touchstart', e => {
+      const handleTouchStart = (e) => {
         touchStartX = e.changedTouches[0].screenX;
-      }, { passive: true });
+      };
       
-      galleryContainer.addEventListener('touchend', e => {
+      const handleTouchEnd = (e) => {
         touchEndX = e.changedTouches[0].screenX;
         handleSwipe();
-      }, { passive: true });
+      };
+      
+      galleryContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+      galleryContainer.addEventListener('touchend', handleTouchEnd, { passive: true });
+      
+      // Store the event listeners for cleanup
+      galleryContainer._touchStartHandler = handleTouchStart;
+      galleryContainer._touchEndHandler = handleTouchEnd;
     }
     
     // Handle swipe for gallery navigation
@@ -1913,14 +1953,135 @@
       galleryCounter.textContent = `${currentGalleryIndex + 1}/${currentGalleryImages.length}`;
     }
     
-    // Close gallery
+    // Close gallery - FIXED
     function closeGallery() {
       galleryLightbox.style.display = 'none';
       document.body.style.overflow = '';
+      
+      // Remove touch event listeners
+      if (galleryContainer._touchStartHandler) {
+        galleryContainer.removeEventListener('touchstart', galleryContainer._touchStartHandler);
+      }
+      if (galleryContainer._touchEndHandler) {
+        galleryContainer.removeEventListener('touchend', galleryContainer._touchEndHandler);
+      }
+      
       currentGalleryImages = [];
       currentGalleryIndex = 0;
     }
     
+    // Lightbox functions with zoom - FIXED for college image
+    window.openLightbox = function(src) {
+      lightboxImage.src = src;
+      lightbox.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      resetLightboxZoom();
+    };
+
+    window.closeLightbox = function() {
+      lightbox.style.display = 'none';
+      document.body.style.overflow = '';
+      resetLightboxZoom();
+    };
+
+    function resetLightboxZoom() {
+      currentScale = 1;
+      lightboxImage.style.transform = `scale(${currentScale})`;
+      lightboxImage.style.cursor = 'default';
+      lightboxImage.style.maxWidth = '90vw';
+      lightboxImage.style.maxHeight = '90vh';
+    }
+
+    function zoomLightbox(factor) {
+      currentScale *= factor;
+      if (currentScale < minScale) currentScale = minScale;
+      if (currentScale > maxScale) currentScale = maxScale;
+      lightboxImage.style.transform = `scale(${currentScale})`;
+      lightboxImage.style.cursor = currentScale > 1 ? 'move' : 'default';
+    }
+
+    // Setup zoom controls
+    document.getElementById('lightbox-zoom-in').addEventListener('click', (e) => {
+      e.stopPropagation();
+      zoomLightbox(1.2);
+    });
+
+    document.getElementById('lightbox-zoom-out').addEventListener('click', (e) => {
+      e.stopPropagation();
+      zoomLightbox(0.8);
+    });
+
+    document.getElementById('lightbox-reset-zoom').addEventListener('click', (e) => {
+      e.stopPropagation();
+      resetLightboxZoom();
+    });
+
+    // Zoom with mouse wheel
+    lightboxImage.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        zoomLightbox(1.1);
+      } else {
+        zoomLightbox(0.9);
+      }
+    });
+
+    // Dragging for zoomed images
+    lightboxImage.addEventListener('mousedown', (e) => {
+      if (currentScale <= 1) return;
+      e.preventDefault();
+      isDragging = true;
+      startX = e.pageX - lightboxImage.offsetLeft;
+      startY = e.pageY - lightboxImage.offsetTop;
+      scrollLeft = lightboxImage.scrollLeft;
+      scrollTop = lightboxImage.scrollTop;
+      lightboxImage.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging || currentScale <= 1) return;
+      e.preventDefault();
+      const x = e.pageX - lightboxImage.offsetLeft;
+      const y = e.pageY - lightboxImage.offsetTop;
+      const walkX = (x - startX) * 2;
+      const walkY = (y - startY) * 2;
+      lightboxImage.scrollLeft = scrollLeft - walkX;
+      lightboxImage.scrollTop = scrollTop - walkY;
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+      if (currentScale > 1) {
+        lightboxImage.style.cursor = 'grab';
+      }
+    });
+
+    // Close lightbox when clicking outside the image
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) {
+        closeLightbox();
+      }
+    });
+
+    // Close lightbox with ESC key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && lightbox.style.display === 'flex') {
+        closeLightbox();
+      }
+      // Also close gallery with ESC
+      if (e.key === 'Escape' && galleryLightbox.style.display === 'flex') {
+        closeGallery();
+      }
+      // Navigate gallery with arrow keys
+      if (galleryLightbox.style.display === 'flex') {
+        if (e.key === 'ArrowLeft') {
+          navigateGallery(-1);
+        } else if (e.key === 'ArrowRight') {
+          navigateGallery(1);
+        }
+      }
+    });
+
     // Attach click handler to cancel reply button
     cancelReplyBtn.addEventListener('click', cancelReply);
     
@@ -2191,9 +2352,10 @@
       }
       content += messageText;
       
-      // Handle multiple images with collage
+      // Handle multiple images with collage - FIXED for college image
       if (data.type === 'multiple' && data.images && data.images.length > 0) {
-        content += createImageCollage(data.images);
+        const collageElement = createImageCollage(data.images);
+        content += collageElement;
         content += `<br><a class="download-link" href="${data.images[0].url}" download>⬇️ Download Images</a>`;
       } else if (data.type === 'image') {
         content += `<br><img class="chat-image" src="${data.url}" alt="Image" loading="lazy" onclick="openLightbox('${data.url}')" />`;
@@ -2227,118 +2389,6 @@
         attachLongPressAndContext(msg, isSender, data);
       }
     }
-
-    // Lightbox functions with zoom
-    window.openLightbox = function(src) {
-      lightboxImage.src = src;
-      lightbox.style.display = 'flex';
-      document.body.style.overflow = 'hidden';
-      resetLightboxZoom();
-    };
-
-    window.closeLightbox = function() {
-      lightbox.style.display = 'none';
-      document.body.style.overflow = '';
-      resetLightboxZoom();
-    };
-
-    function resetLightboxZoom() {
-      currentScale = 1;
-      lightboxImage.style.transform = `scale(${currentScale})`;
-      lightboxImage.style.cursor = 'default';
-      lightboxImage.style.maxWidth = '90vw';
-      lightboxImage.style.maxHeight = '90vh';
-    }
-
-    function zoomLightbox(factor) {
-      currentScale *= factor;
-      if (currentScale < minScale) currentScale = minScale;
-      if (currentScale > maxScale) currentScale = maxScale;
-      lightboxImage.style.transform = `scale(${currentScale})`;
-      lightboxImage.style.cursor = currentScale > 1 ? 'move' : 'default';
-    }
-
-    // Setup zoom controls
-    document.getElementById('lightbox-zoom-in').addEventListener('click', (e) => {
-      e.stopPropagation();
-      zoomLightbox(1.2);
-    });
-
-    document.getElementById('lightbox-zoom-out').addEventListener('click', (e) => {
-      e.stopPropagation();
-      zoomLightbox(0.8);
-    });
-
-    document.getElementById('lightbox-reset-zoom').addEventListener('click', (e) => {
-      e.stopPropagation();
-      resetLightboxZoom();
-    });
-
-    // Zoom with mouse wheel
-    lightboxImage.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      if (e.deltaY < 0) {
-        zoomLightbox(1.1);
-      } else {
-        zoomLightbox(0.9);
-      }
-    });
-
-    // Dragging for zoomed images
-    lightboxImage.addEventListener('mousedown', (e) => {
-      if (currentScale <= 1) return;
-      e.preventDefault();
-      isDragging = true;
-      startX = e.pageX - lightboxImage.offsetLeft;
-      startY = e.pageY - lightboxImage.offsetTop;
-      scrollLeft = lightboxImage.scrollLeft;
-      scrollTop = lightboxImage.scrollTop;
-      lightboxImage.style.cursor = 'grabbing';
-    });
-
-    document.addEventListener('mousemove', (e) => {
-      if (!isDragging || currentScale <= 1) return;
-      e.preventDefault();
-      const x = e.pageX - lightboxImage.offsetLeft;
-      const y = e.pageY - lightboxImage.offsetTop;
-      const walkX = (x - startX) * 2;
-      const walkY = (y - startY) * 2;
-      lightboxImage.scrollLeft = scrollLeft - walkX;
-      lightboxImage.scrollTop = scrollTop - walkY;
-    });
-
-    document.addEventListener('mouseup', () => {
-      isDragging = false;
-      if (currentScale > 1) {
-        lightboxImage.style.cursor = 'grab';
-      }
-    });
-
-    // Close lightbox when clicking outside the image
-    lightbox.addEventListener('click', (e) => {
-      if (e.target === lightbox) {
-        closeLightbox();
-      }
-    });
-
-    // Close lightbox with ESC key
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && lightbox.style.display === 'flex') {
-        closeLightbox();
-      }
-      // Also close gallery with ESC
-      if (e.key === 'Escape' && galleryLightbox.style.display === 'flex') {
-        closeGallery();
-      }
-      // Navigate gallery with arrow keys
-      if (galleryLightbox.style.display === 'flex') {
-        if (e.key === 'ArrowLeft') {
-          navigateGallery(-1);
-        } else if (e.key === 'ArrowRight') {
-          navigateGallery(1);
-        }
-      }
-    });
 
     // GIF Picker Functions
     function showGifPicker() {
@@ -2430,7 +2480,8 @@
           preview: replyingToMessage.message 
             ? replyingToMessage.message.substring(0, 50) 
             : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
-        } : null
+        } : null,
+        roomId: currentRoom ? currentRoom.id : null
       };
       
       if (currentRoom) {
@@ -2482,9 +2533,57 @@
         if (textContent.toLowerCase().startsWith('echat')) {
           const query = textContent.substring(5).trim();
           if (query) {
-            // Send to Gemini AI
-            socket.emit('ai query', { query, id, name });
+            // Send to Gemini AI with room context - FIXED for AI response display
+            socket.emit('ai query', { 
+              query, 
+              id, 
+              name, 
+              roomId: currentRoom ? currentRoom.id : null 
+            });
+            
+            // Create user message immediately to show it's been sent
+            const userMsgData = {
+              id,
+              name,
+              message: textContent,
+              timestamp: Date.now(),
+              replyTo: replyingToMessage ? {
+                id: replyingToMessage.id,
+                name: replyingToMessage.name,
+                preview: replyingToMessage.message 
+                  ? replyingToMessage.message.substring(0, 50) 
+                  : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
+              } : null,
+              roomId: currentRoom ? currentRoom.id : null
+            };
+            
+            createMessageElement(userMsgData, true);
           }
+        } else if (textContent) {
+          // Regular message
+          const msg = { 
+            id, 
+            name, 
+            message: textContent, 
+            timestamp: Date.now(),
+            replyTo: replyingToMessage ? {
+              id: replyingToMessage.id,
+              name: replyingToMessage.name,
+              preview: replyingToMessage.message 
+                ? replyingToMessage.message.substring(0, 50) 
+                : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
+            } : null,
+            roomId: currentRoom ? currentRoom.id : null
+          };
+          
+          if (currentRoom) {
+            msg.roomId = currentRoom.id;
+            socket.emit('private message', msg);
+          } else {
+            socket.emit('chat message', msg);
+          }
+          
+          createMessageElement(msg, true);
         }
         
         if (images.length > 0) {
@@ -2510,7 +2609,8 @@
                 preview: replyingToMessage.message 
                   ? replyingToMessage.message.substring(0, 50) 
                   : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
-              } : null
+              } : null,
+              roomId: currentRoom ? currentRoom.id : null
             };
             
             if (currentRoom) {
@@ -2543,7 +2643,8 @@
                   preview: replyingToMessage.message 
                     ? replyingToMessage.message.substring(0, 50) 
                     : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
-                } : null
+                } : null,
+                roomId: currentRoom ? currentRoom.id : null
               };
               
               if (currentRoom) {
@@ -2556,31 +2657,6 @@
               createMessageElement(payload, true);
             });
           }
-        }
-        
-        if (textContent && !textContent.toLowerCase().startsWith('echat')) {
-          const msg = { 
-            id, 
-            name, 
-            message: textContent, 
-            timestamp: Date.now(),
-            replyTo: replyingToMessage ? {
-              id: replyingToMessage.id,
-              name: replyingToMessage.name,
-              preview: replyingToMessage.message 
-                ? replyingToMessage.message.substring(0, 50) 
-                : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
-            } : null
-          };
-          
-          if (currentRoom) {
-            msg.roomId = currentRoom.id;
-            socket.emit('private message', msg);
-          } else {
-            socket.emit('chat message', msg);
-          }
-          
-          createMessageElement(msg, true);
         }
         
         richInput.textContent = '';
@@ -2651,14 +2727,17 @@
                 preview: replyingToMessage.message 
                   ? replyingToMessage.message.substring(0, 50) 
                   : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
-              } : null
+              } : null,
+              roomId: currentRoom ? currentRoom.id : null
             };
             
             if (currentRoom) {
               payload.roomId = currentRoom.id;
+              socket.emit('private message', payload);
+            } else {
+              socket.emit('chat image', payload);
             }
             
-            socket.emit('chat image', payload);
             createMessageElement(payload, true);
           }
         } else {
@@ -2696,7 +2775,8 @@
               preview: replyingToMessage.message 
                 ? replyingToMessage.message.substring(0, 50) 
                 : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
-            } : null
+            } : null,
+            roomId: currentRoom ? currentRoom.id : null
           };
           
           if (currentRoom) {
@@ -2763,7 +2843,8 @@
                 preview: replyingToMessage.message 
                   ? replyingToMessage.message.substring(0, 50) 
                   : (replyingToMessage.type === 'image' ? 'Image' : replyingToMessage.type === 'gif' ? 'GIF' : 'File')
-              } : null
+              } : null,
+              roomId: currentRoom ? currentRoom.id : null
             };
             
             if (currentRoom) {
@@ -3057,124 +3138,154 @@
         processor.connect(audioContext.destination);
         
         processor.onaudioprocess = e => {
-          if (!isStreaming) return;
-          const input = e.inputBuffer.getChannelData(0);
-          const int16Data = convertFloat32ToInt16(input);
-          socket.emit('voice-stream', int16Data);
-        };
-        
-        voiceBtn.classList.add('speaking');
-      } catch (error) {
-        console.error('Microphone access error:', error);
-        alert("Microphone access denied or not available");
-        isStreaming = false;
-      }
-    }
-
-    function stopStreaming() {
-      isStreaming = false;
-      if (processor) {
-        processor.disconnect();
-        processor.onaudioprocess = null;
-      }
-      if (source) source.disconnect();
-      if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
-      if (audioContext) audioContext.close();
-      
-      processor = source = mediaStream = audioContext = null;
-      voiceBtn.classList.remove('speaking');
-    }
-
-    voiceBtn.addEventListener('mousedown', startStreaming);
-    voiceBtn.addEventListener('mouseup', stopStreaming);
-    voiceBtn.addEventListener('touchstart', e => { 
-      e.preventDefault(); 
-      startStreaming(); 
-    });
-    voiceBtn.addEventListener('touchend', e => { 
-      e.preventDefault(); 
-      stopStreaming(); 
-    });
-
-    // Voice playback
-    const playbackContext = new (window.AudioContext || window.webkitAudioContext)();
-    socket.on('voice-stream', data => {
-      try {
-        const int16 = new Int16Array(data);
-        const float32 = new Float32Array(int16.length);
-        for (let i = 0; i < int16.length; i++) {
-          float32[i] = int16[i] / 0x7FFF;
-        }
-        const buffer = playbackContext.createBuffer(1, float32.length, 44100);
-        buffer.copyToChannel(float32, 0);
-        const src = playbackContext.createBufferSource();
-        src.buffer = buffer;
-        src.connect(playbackContext.destination);
-        src.start();
-      } catch (error) {
-        console.error('Voice playback error:', error);
-      }
-    });
-
-    // Connection management
-    socket.on('connect', () => {
-      console.log('Connected to server');
-      userList.textContent = 'Connected...';
-      
-      // Request private rooms list
-      socket.emit('get private rooms');
-    });
-
-    socket.on('disconnect', () => {
-      console.log('Disconnected from server');
-      userList.textContent = 'Disconnected. Reconnecting...';
-    });
-
-    socket.on('reconnect', () => {
-      console.log('Reconnected to server');
-      socket.emit('user joined', name);
-      
-      // Request private rooms list
-      socket.emit('get private rooms');
-    });
-
-    // Request private rooms list on page load
-    socket.emit('get private rooms');
-
-    // Prevent zoom on double tap
-    let lastTouchEnd = 0;
-    document.addEventListener('touchend', function (event) {
-      const now = (new Date()).getTime();
-      if (now - lastTouchEnd <= 300) {
-        event.preventDefault();
-      }
-      lastTouchEnd = now;
-    }, false);
-
-    // Mobile viewport handling
-    function handleViewportResize() {
-      const vh = window.innerHeight * 0.01;
-      document.documentElement.style.setProperty('--vh', `${vh}px`);
-    }
-
-    window.addEventListener('resize', handleViewportResize);
-    window.addEventListener('orientationchange', () => {
-      setTimeout(handleViewportResize, 100);
-    });
+      if (!isStreaming) return;
+      const input = e.inputBuffer.getChannelData(0);
+      const int16Data = convertFloat32ToInt16(input);
+      socket.emit('voice-stream', int16Data);
+    };
     
-    handleViewportResize();
+    voiceBtn.classList.add('speaking');
+  } catch (error) {
+    console.error('Microphone access error:', error);
+    alert("Microphone access denied or not available");
+    isStreaming = false;
+  }
+}
 
-    // Green border pulse effect after 5 seconds
-    setTimeout(() => {
-      const container = document.getElementById('chat-container');
-      container.classList.add('border-pulse');
-      
-      container.addEventListener('animationend', () => {
-        container.classList.remove('border-pulse');
-      }, { once: true });
-    }, 5000);
+function stopStreaming() {
+  isStreaming = false;
+  if (processor) {
+    processor.disconnect();
+    processor.onaudioprocess = null;
+  }
+  if (source) source.disconnect();
+  if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+  if (audioContext) audioContext.close();
+  
+  processor = source = mediaStream = audioContext = null;
+  voiceBtn.classList.remove('speaking');
+}
 
-    console.log('✅ Enhanced Echat with Gemini AI and new features loaded');
+voiceBtn.addEventListener('mousedown', startStreaming);
+voiceBtn.addEventListener('mouseup', stopStreaming);
+voiceBtn.addEventListener('touchstart', e => { 
+  e.preventDefault(); 
+  startStreaming(); 
+});
+voiceBtn.addEventListener('touchend', e => { 
+  e.preventDefault(); 
+  stopStreaming(); 
+});
+
+// Voice playback
+const playbackContext = new (window.AudioContext || window.webkitAudioContext)();
+socket.on('voice-stream', data => {
+  try {
+    const int16 = new Int16Array(data);
+    const float32 = new Float32Array(int16.length);
+    for (let i = 0; i < int16.length; i++) {
+      float32[i] = int16[i] / 0x7FFF;
+    }
+    const buffer = playbackContext.createBuffer(1, float32.length, 44100);
+    buffer.copyToChannel(float32, 0);
+    const src = playbackContext.createBufferSource();
+    src.buffer = buffer;
+    src.connect(playbackContext.destination);
+    src.start();
+  } catch (error) {
+    console.error('Voice playback error:', error);
+  }
+});
+
+// Connection management
+socket.on('connect', () => {
+  console.log('Connected to server');
+  userList.textContent = 'Connected...';
+  
+  // Request private rooms list
+  socket.emit('get private rooms');
+  
+  // Try to rejoin private room if previously in one
+  const savedRoom = localStorage.getItem('currentRoom');
+  if (savedRoom) {
+    try {
+      const roomData = JSON.parse(savedRoom);
+      socket.emit('join private room', { 
+        roomId: roomData.id, 
+        password: roomData.password 
+      });
+    } catch (e) {
+      console.error('Error rejoining room:', e);
+      localStorage.removeItem('currentRoom');
+    }
+  }
+});
+
+socket.on('disconnect', () => {
+  console.log('Disconnected from server');
+  userList.textContent = 'Disconnected. Reconnecting...';
+});
+
+socket.on('reconnect', () => {
+  console.log('Reconnected to server');
+  socket.emit('user joined', name);
+  
+  // Request private rooms list
+  socket.emit('get private rooms');
+  
+  // Try to rejoin private room if previously in one
+  const savedRoom = localStorage.getItem('currentRoom');
+  if (savedRoom) {
+    try {
+      const roomData = JSON.parse(savedRoom);
+      socket.emit('join private room', { 
+        roomId: roomData.id, 
+        password: roomData.password 
+      });
+    } catch (e) {
+      console.error('Error rejoining room:', e);
+      localStorage.removeItem('currentRoom');
+    }
+  }
+});
+
+// Request private rooms list on page load
+socket.emit('get private rooms');
+
+// Prevent zoom on double tap
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function (event) {
+  const now = (new Date()).getTime();
+  if (now - lastTouchEnd <= 300) {
+    event.preventDefault();
+  }
+  lastTouchEnd = now;
+}, false);
+
+// Mobile viewport handling
+function handleViewportResize() {
+  const vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+
+window.addEventListener('resize', handleViewportResize);
+window.addEventListener('orientationchange', () => {
+  setTimeout(handleViewportResize, 100);
+});
+
+handleViewportResize();
+
+// Green border pulse effect after 5 seconds
+setTimeout(() => {
+  const container = document.getElementById('chat-container');
+  container.classList.add('border-pulse');
+  
+  container.addEventListener('animationend', () => {
+    container.classList.remove('border-pulse');
+  }, { once: true });
+}, 5000);
+
+console.log('✅ Enhanced Echat with Gemini AI and new features loaded');
   </script>
 </body>
 </html>

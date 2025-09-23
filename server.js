@@ -26,7 +26,7 @@ mongoose.connect('mongodb+srv://swatantrakumar1582011:EcaewvoJs0wWpHRn@cluster0.
   })
   .catch(err => console.error(err));
 
-// Message schema with replyTo structure
+// Message schema with replyTo structure - FIXED for persistence
 const messageSchema = new mongoose.Schema({
   id: String,
   name: String,
@@ -44,11 +44,11 @@ const messageSchema = new mongoose.Schema({
     name: String,
     preview: String
   },
-  roomId: String // For private room messages
+  roomId: { type: String, default: null } // For private room messages, null for public
 });
 const Message = mongoose.model('Message', messageSchema);
 
-// Private Room schema
+// Private Room schema - FIXED for auto-expiration
 const privateRoomSchema = new mongoose.Schema({
   id: String,
   name: String,
@@ -56,6 +56,7 @@ const privateRoomSchema = new mongoose.Schema({
   creator: String,
   createdAt: { type: Date, default: Date.now },
   users: [String],
+  lastActivity: { type: Date, default: Date.now },
   expiresAt: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) } // 24 hours from creation
 });
 const PrivateRoom = mongoose.model('PrivateRoom', privateRoomSchema);
@@ -184,7 +185,7 @@ async function loadPrivateRooms() {
   }
 }
 
-// Expire a private room
+// Expire a private room - FIXED for auto-expiration
 async function expirePrivateRoom(roomId) {
   try {
     // Delete all messages from this room
@@ -209,14 +210,15 @@ function generateRoomId() {
   return Math.random().toString(36).substring(2, 10);
 }
 
-// Generate AI response using Gemini
-async function generateAIResponse(query) {
+// Generate AI response using Gemini - FIXED for AI response display
+async function generateAIResponse(query, context = '') {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     const prompt = `You are a helpful AI assistant in a chat app called Echat. 
     Respond to the user's query in a friendly, conversational manner. 
     Keep your response concise and under 200 words.
+    ${context ? `Context: ${context}` : ''}
     
     User query: ${query}`;
     
@@ -229,7 +231,7 @@ async function generateAIResponse(query) {
   }
 }
 
-// Socket.IO Logic
+// Socket.IO Logic - FIXED for all reported issues
 io.on('connection', socket => {
   let userName = '';
 
@@ -238,8 +240,8 @@ io.on('connection', socket => {
     io.emit('online users', { count: users.length, users });
   };
 
-  // Send previous messages (only public messages)
-  Message.find({ roomId: { $exists: false } })
+  // Send previous messages (only public messages) - FIXED for persistence
+  Message.find({ roomId: null }) // Changed from { $exists: false } to null for better query
     .sort({ timestamp: 1 })
     .then(messages => {
       socket.emit('previous messages', messages);
@@ -265,6 +267,9 @@ io.on('connection', socket => {
       
       data.reactions = data.reactions || {};
       data.timestamp = data.timestamp || Date.now();
+      // Ensure roomId is null for public messages
+      data.roomId = null;
+      
       const msg = new Message(data);
       await msg.save();
       
@@ -275,24 +280,76 @@ io.on('connection', socket => {
       socket.emit('error', { message: 'Failed to save message' });
     }
   });
+  
+      socket.on('ai query', async (data) => {
+  try {
+      // 1️⃣ Save the user's query in messages
+      const userMsg = new Message({
+        id: data.id,
+        name: data.name,
+        message: data.query,
+        timestamp: Date.now(),
+        roomId: data.roomId || null
+      });
+      await userMsg.save();
 
-  socket.on('ai query', async (data) => {
-    try {
-      const aiResponse = await generateAIResponse(data.query);
+      // Show it to everyone (including sender)
+      if (data.roomId) {
+        io.to(data.roomId).emit('chat message', userMsg);
+      } else {
+        io.emit('chat message', userMsg);
+      }
+
+      // 2️⃣ Then generate AI response (your existing code below)
+
+      // Get conversation context for better AI responses
+      let context = '';
+      if (data.roomId) {
+        // Get recent messages from the room for context
+        const recentMessages = await Message.find({ 
+          roomId: data.roomId,
+          timestamp: { $gt: new Date(Date.now() - 5 * 60 * 1000) } // Last 5 minutes
+        }).sort({ timestamp: -1 }).limit(10);
+        
+        context = recentMessages
+          .map(msg => `${msg.name}: ${msg.message || (msg.type === 'image' ? 'Sent an image' : 'Sent a file')}`)
+          .reverse()
+          .join('\n');
+      } else {
+        // Get recent public messages for context
+        const recentMessages = await Message.find({ 
+          roomId: null,
+          timestamp: { $gt: new Date(Date.now() - 5 * 60 * 1000) } // Last 5 minutes
+        }).sort({ timestamp: -1 }).limit(10);
+        
+        context = recentMessages
+          .map(msg => `${msg.name}: ${msg.message || (msg.type === 'image' ? 'Sent an image' : 'Sent a file')}`)
+          .reverse()
+          .join('\n');
+      }
+      
+      // Generate AI response with context
+      const aiResponse = await generateAIResponse(data.query, context);
       
       const responseData = {
-        id: data.id,
+        id: data.id + '-ai',
         name: '🤖 Echat AI',
         message: aiResponse,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        roomId: data.roomId || null
       };
       
-      const msg = new Message(responseData);
-      await msg.save();
+      const aiMsg = new Message(responseData);
+      await aiMsg.save();
       
-      // Send AI response to everyone in the room
-      socket.emit('ai response', responseData);
-      socket.broadcast.emit('ai response', responseData);
+      // Send AI response to the appropriate room - FIXED for proper display
+      if (data.roomId) {
+        // Private room - send to all including sender
+        io.to(data.roomId).emit('ai response', responseData);
+      } else {
+        // Public chat - send to all including sender
+        io.emit('ai response', responseData);
+      }
     } catch (error) {
       console.error('Error processing AI query:', error);
       socket.emit('error', { message: 'Failed to process AI query' });
@@ -308,6 +365,8 @@ io.on('connection', socket => {
       
       data.reactions = data.reactions || {};
       data.timestamp = data.timestamp || Date.now();
+      // Ensure roomId is null for public messages
+      data.roomId = null;
       
       const isGif = data.type === 'gif' || 
                    data.mimeType === 'image/gif' || 
@@ -337,6 +396,9 @@ io.on('connection', socket => {
       
       data.reactions = data.reactions || {};
       data.timestamp = data.timestamp || Date.now();
+      // Ensure roomId is null for public messages
+      data.roomId = null;
+      
       const msg = new Message(data);
       await msg.save();
       
@@ -348,7 +410,7 @@ io.on('connection', socket => {
     }
   });
 
-  // Private room events
+  // Private room events - FIXED for auto-expiration
   socket.on('create private room', async (data) => {
     try {
       const roomId = generateRoomId();
@@ -358,6 +420,7 @@ io.on('connection', socket => {
         password: data.password,
         creator: userName,
         users: [socket.id],
+        lastActivity: new Date(),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
       });
       
@@ -394,10 +457,17 @@ io.on('connection', socket => {
         return;
       }
       
+      // Update last activity
+      room.lastActivity = new Date();
+      await PrivateRoom.updateOne({ id: room.id }, { lastActivity: room.lastActivity });
+      
       // Add user to room
       if (!room.users.includes(socket.id)) {
         room.users.push(socket.id);
-        await PrivateRoom.updateOne({ id: room.id }, { users: room.users });
+        await PrivateRoom.updateOne({ id: room.id }, { 
+          users: room.users,
+          lastActivity: room.lastActivity 
+        });
       }
       
       // Join socket room
@@ -433,7 +503,7 @@ io.on('connection', socket => {
     socket.emit('private room left');
     
     // Send public messages
-    Message.find({ roomId: { $exists: false } })
+    Message.find({ roomId: null })
       .sort({ timestamp: 1 })
       .then(messages => {
         socket.emit('previous messages', messages);
@@ -446,6 +516,10 @@ io.on('connection', socket => {
       const room = privateRooms.get(data.roomId);
       
       if (room && room.users.includes(socket.id)) {
+        // Update last activity
+        room.lastActivity = new Date();
+        await PrivateRoom.updateOne({ id: room.id }, { lastActivity: room.lastActivity });
+        
         // Ensure replyTo structure is maintained
         if (data.replyTo && !data.replyTo.id) {
           delete data.replyTo;
@@ -505,10 +579,10 @@ io.on('connection', socket => {
 
   socket.on('clear all chat', async () => {
     try {
-      // Only delete public messages (those without a roomId)
+      // Only delete public messages (those with roomId = null)
       const publicMessagesWithFiles = await Message.find({ 
         fileId: { $exists: true },
-        roomId: { $exists: false }
+        roomId: null
       });
       
       for (const message of publicMessagesWithFiles) {
@@ -524,7 +598,7 @@ io.on('connection', socket => {
       }
       
       // Only delete public messages
-      await Message.deleteMany({ roomId: { $exists: false } });
+      await Message.deleteMany({ roomId: null });
       
       // Notify all clients to clear public chat
       io.emit('clear all chat');
@@ -596,7 +670,7 @@ io.on('connection', socket => {
       broadcastUsers();
     }
     
-    // Remove user from private rooms
+    // Remove user from private rooms and check for expiration
     privateRooms.forEach((room, roomId) => {
       const userIndex = room.users.indexOf(socket.id);
       if (userIndex !== -1) {
@@ -606,9 +680,13 @@ io.on('connection', socket => {
         PrivateRoom.updateOne({ id: roomId }, { users: room.users })
           .catch(err => console.error('Error updating room users:', err));
         
-        // If no users left, delete the room
+        // If no users left, check if room should be expired
         if (room.users.length === 0) {
-          expirePrivateRoom(roomId);
+          const timeSinceLastActivity = new Date() - room.lastActivity;
+          // If room has been inactive for more than 1 hour, expire it
+          if (timeSinceLastActivity > 60 * 60 * 1000) {
+            expirePrivateRoom(roomId);
+          }
         }
       }
     });
@@ -631,6 +709,16 @@ setInterval(async () => {
   try {
     const expiredRooms = await PrivateRoom.find({ expiresAt: { $lt: new Date() } });
     for (const room of expiredRooms) {
+      await expirePrivateRoom(room.id);
+    }
+    
+    // Also cleanup rooms that have been inactive for too long
+    const inactiveRooms = await PrivateRoom.find({ 
+      lastActivity: { $lt: new Date(Date.now() - 60 * 60 * 1000) }, // 1 hour
+      users: { $size: 0 } // No users
+    });
+    
+    for (const room of inactiveRooms) {
       await expirePrivateRoom(room.id);
     }
   } catch (error) {
