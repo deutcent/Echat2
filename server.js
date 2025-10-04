@@ -10,8 +10,24 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI("AIzaSyDVF2JHZcNQEWLCmjEPrXI5n2WRcnTpEQU");
+// Initialize Gemini AI with proper error handling
+let genAI;
+try {
+  genAI = new GoogleGenerativeAI("AIzaSyDVF2JHZcNQEWLCmjEPrXI5n2WRcnTpEQU");
+  console.log('✅ Gemini AI initialized successfully');
+} catch (error) {
+  console.error('❌ Failed to initialize Gemini AI:', error);
+  // Create a dummy genAI object to prevent crashes
+  genAI = {
+    getGenerativeModel: () => ({
+      generateContent: async () => ({
+        response: await Promise.resolve({
+          text: () => "I'm Echat AI, but there was an issue initializing the AI service. Please check the API key."
+        })
+      })
+    })
+  };
+}
 
 // MongoDB Connection with GridFS
 let bucket;
@@ -21,12 +37,11 @@ mongoose.connect('mongodb+srv://swatantrakumar1582011:EcaewvoJs0wWpHRn@cluster0.
 })
   .then(() => {
     console.log('✅ MongoDB Connected');
-    // Use mongoose's underlying mongo driver GridFSBucket
     bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
   })
   .catch(err => console.error(err));
 
-// Message schema with replyTo structure - FIXED for persistence
+// Message schema
 const messageSchema = new mongoose.Schema({
   id: String,
   name: String,
@@ -44,11 +59,11 @@ const messageSchema = new mongoose.Schema({
     name: String,
     preview: String
   },
-  roomId: { type: String, default: null } // For private room messages, null for public
+  roomId: { type: String, default: null }
 });
 const Message = mongoose.model('Message', messageSchema);
 
-// Private Room schema - FIXED for auto-expiration
+// Private Room schema
 const privateRoomSchema = new mongoose.Schema({
   id: String,
   name: String,
@@ -57,14 +72,12 @@ const privateRoomSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   users: [String],
   lastActivity: { type: Date, default: Date.now },
-  expiresAt: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) } // 24 hours from creation
+  expiresAt: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) }
 });
 const PrivateRoom = mongoose.model('PrivateRoom', privateRoomSchema);
 
-// Online Users & Reactions
+// Online Users & Rooms
 let onlineUsers = new Map();
-
-// Store private rooms in memory for faster access (will also be stored in DB)
 let privateRooms = new Map();
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -74,7 +87,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ 
   storage,
   limits: { 
-    fileSize: 50 * 1024 * 1024, // 50MB
+    fileSize: 50 * 1024 * 1024,
     files: 1
   }
 });
@@ -136,7 +149,6 @@ app.get('/file/:fileId', (req, res) => {
 
     let sentHeader = false;
     downloadStream.on('file', (file) => {
-      // set sensible headers for download with original filename when possible
       const mimeType = (file.metadata && file.metadata.mimeType) ? file.metadata.mimeType : 'application/octet-stream';
       const originalName = (file.metadata && file.metadata.originalName) ? file.metadata.originalName : file.filename;
 
@@ -168,15 +180,18 @@ app.get('/file/:fileId', (req, res) => {
 async function loadPrivateRooms() {
   try {
     const rooms = await PrivateRoom.find({ expiresAt: { $gt: new Date() } });
+    privateRooms.clear();
+    
     rooms.forEach(room => {
       privateRooms.set(room.id, room);
       
-      // Set timeout to destroy room after expiration
       const timeUntilExpiry = room.expiresAt - new Date();
       if (timeUntilExpiry > 0) {
         setTimeout(() => {
           expirePrivateRoom(room.id);
         }, timeUntilExpiry);
+      } else {
+        expirePrivateRoom(room.id);
       }
     });
     console.log(`✅ Loaded ${rooms.length} private rooms from database`);
@@ -185,19 +200,15 @@ async function loadPrivateRooms() {
   }
 }
 
-// Expire a private room - FIXED for auto-expiration
+// Expire a private room
 async function expirePrivateRoom(roomId) {
   try {
-    // Delete all messages from this room
+    console.log(`🕒 Expiring private room ${roomId}`);
+    
     await Message.deleteMany({ roomId });
-    
-    // Delete the room from database
     await PrivateRoom.deleteOne({ id: roomId });
-    
-    // Remove from memory
     privateRooms.delete(roomId);
     
-    // Notify users
     io.emit('private room expired', roomId);
     console.log(`✅ Private room ${roomId} expired and was deleted`);
   } catch (error) {
@@ -210,80 +221,152 @@ function generateRoomId() {
   return Math.random().toString(36).substring(2, 10);
 }
 
-// Generate AI response using Gemini - FIXED for AI response display
+// Generate AI response using Gemini - COMPLETELY FIXED
 async function generateAIResponse(query, context = '') {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    console.log('🔍 Generating Echat AI response for query:', query);
     
-    const prompt = `You are a helpful AI assistant in a chat app called Echat. 
-    Respond to the user's query in a friendly, conversational manner. 
-    Keep your response concise and under 200 words.
-    ${context ? `Context: ${context}` : ''}
+    // Remove the trigger words from the query
+    const cleanedQuery = query.replace(/^(echat|Echat|echat ai|Echat AI)\s*/i, '').trim();
     
-    User query: ${query}`;
+    if (!cleanedQuery) {
+      return "I'm Echat AI! How can I help you today? Feel free to ask me anything.";
+    }
+
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-pro",
+      generationConfig: {
+        maxOutputTokens: 1000,
+        temperature: 0.7,
+      }
+    });
     
+    const prompt = `You are Echat AI, a helpful and friendly AI assistant integrated into a chat application. 
+    Provide a clear, concise, and helpful response to the user's question.
+    Be conversational and engaging in your response.
+    If the question is about current events or real-time information, provide the most up-to-date knowledge you have.
+    
+    User question: "${cleanedQuery}"
+    
+    Please respond directly to the question in a helpful manner.`;
+    
+    console.log('📤 Sending prompt to Gemini AI...');
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    return response.text();
+    const text = response.text();
+    
+    console.log('✅ Received AI response:', text.substring(0, 100) + '...');
+    return text;
+    
   } catch (error) {
-    console.error('Error generating AI response:', error);
-    return "Sorry, I'm having trouble processing your request right now. Please try again later.";
+    console.error('❌ Error generating AI response:', error);
+    
+    // More specific error messages
+    if (error.message.includes('API_KEY_INVALID')) {
+      return "I'm Echat AI, but there's an issue with my configuration. Please check the API key.";
+    } else if (error.message.includes('quota')) {
+      return "I'm Echat AI, but I've reached my usage limit. Please try again later.";
+    } else if (error.message.includes('network') || error.message.includes('fetch')) {
+      return "I'm Echat AI, but I'm having trouble connecting to my knowledge base. Please check your internet connection and try again.";
+    } else {
+      return "I'm Echat AI! I'm here to help. It seems there was a temporary issue. Please try asking your question again. You can ask me about anything - science, history, technology, or just chat!";
+    }
   }
 }
 
-// Socket.IO Logic - FIXED for all reported issues
+// Test the AI connection on startup
+async function testAIConnection() {
+  try {
+    console.log('🧪 Testing Gemini AI connection...');
+    const testResponse = await generateAIResponse("Hello, who are you?");
+    console.log('✅ AI Test Response:', testResponse.substring(0, 100) + '...');
+  } catch (error) {
+    console.error('❌ AI Connection Test Failed:', error.message);
+  }
+}
+
+// Socket.IO Logic - COMPLETELY FIXED
 io.on('connection', socket => {
   let userName = '';
+  let isAuthenticated = false;
+  let currentRoomId = null;
 
   const broadcastUsers = () => {
     const users = Array.from(onlineUsers.values());
     io.emit('online users', { count: users.length, users });
   };
 
-  // Send previous messages (only public messages) - FIXED for persistence
-  Message.find({ roomId: null }) // Changed from { $exists: false } to null for better query
+  // Send previous public messages
+  Message.find({ roomId: null })
     .sort({ timestamp: 1 })
     .then(messages => {
       socket.emit('previous messages', messages);
     })
     .catch(err => console.error('Error fetching previous messages:', err));
 
-  socket.on('user joined', name => {
-    userName = name;
-    onlineUsers.set(socket.id, name);
-    io.emit('user joined', name);
-    broadcastUsers();
-    
-    // Send private rooms list
-    socket.emit('private rooms list', Array.from(privateRooms.values()));
+  // Authentication handler
+  socket.on('authenticate', (data) => {
+    if (data.password === 'oracle' && data.name && data.name.trim() !== '') {
+      userName = data.name.trim();
+      isAuthenticated = true;
+      
+      onlineUsers.set(socket.id, userName);
+      io.emit('user joined', userName);
+      broadcastUsers();
+      
+      // Send private rooms list
+      socket.emit('private rooms list', Array.from(privateRooms.values()));
+      socket.emit('authentication success', { name: userName });
+    } else {
+      socket.emit('authentication failed', 'Invalid password or name');
+    }
   });
 
-  socket.on('chat message', async (data) => {
+  // Only allow authenticated users to send messages
+  const requireAuth = (handler) => {
+    return (...args) => {
+      if (!isAuthenticated) {
+        socket.emit('error', { message: 'Please authenticate first' });
+        return;
+      }
+      handler(...args);
+    };
+  };
+
+  // Public chat message handling
+  socket.on('chat message', requireAuth(async (data) => {
     try {
-      // Ensure replyTo structure is maintained
+      // Only allow public messages if not in a private room
+      if (currentRoomId) {
+        socket.emit('error', { message: 'You are in a private room. Leave it to send public messages.' });
+        return;
+      }
+
       if (data.replyTo && !data.replyTo.id) {
         delete data.replyTo;
       }
       
       data.reactions = data.reactions || {};
       data.timestamp = data.timestamp || Date.now();
-      // Ensure roomId is null for public messages
-      data.roomId = null;
+      data.roomId = null; // Public message
       
       const msg = new Message(data);
       await msg.save();
       
-      // Only emit to other users, not back to the sender
-      socket.broadcast.emit('chat message', data);
+      // Broadcast to ALL users for public chat
+      io.emit('chat message', data);
     } catch (error) {
       console.error('Error saving message:', error);
       socket.emit('error', { message: 'Failed to save message' });
     }
-  });
+  }));
   
-      socket.on('ai query', async (data) => {
-  try {
-      // 1️⃣ Save the user's query in messages
+  // AI query handling - COMPLETELY FIXED
+  socket.on('ai query', requireAuth(async (data) => {
+    try {
+      console.log('🤖 Echat AI Query received:', data.query);
+      
+      // Save user's query immediately
       const userMsg = new Message({
         id: data.id,
         name: data.name,
@@ -293,43 +376,16 @@ io.on('connection', socket => {
       });
       await userMsg.save();
 
-      // Show it to everyone (including sender)
+      // Show user's message in the appropriate room immediately
       if (data.roomId) {
         io.to(data.roomId).emit('chat message', userMsg);
       } else {
         io.emit('chat message', userMsg);
       }
 
-      // 2️⃣ Then generate AI response (your existing code below)
-
-      // Get conversation context for better AI responses
-      let context = '';
-      if (data.roomId) {
-        // Get recent messages from the room for context
-        const recentMessages = await Message.find({ 
-          roomId: data.roomId,
-          timestamp: { $gt: new Date(Date.now() - 5 * 60 * 1000) } // Last 5 minutes
-        }).sort({ timestamp: -1 }).limit(10);
-        
-        context = recentMessages
-          .map(msg => `${msg.name}: ${msg.message || (msg.type === 'image' ? 'Sent an image' : 'Sent a file')}`)
-          .reverse()
-          .join('\n');
-      } else {
-        // Get recent public messages for context
-        const recentMessages = await Message.find({ 
-          roomId: null,
-          timestamp: { $gt: new Date(Date.now() - 5 * 60 * 1000) } // Last 5 minutes
-        }).sort({ timestamp: -1 }).limit(10);
-        
-        context = recentMessages
-          .map(msg => `${msg.name}: ${msg.message || (msg.type === 'image' ? 'Sent an image' : 'Sent a file')}`)
-          .reverse()
-          .join('\n');
-      }
-      
-      // Generate AI response with context
-      const aiResponse = await generateAIResponse(data.query, context);
+      // Generate AI response
+      console.log('🔄 Generating AI response...');
+      const aiResponse = await generateAIResponse(data.query);
       
       const responseData = {
         id: data.id + '-ai',
@@ -339,34 +395,54 @@ io.on('connection', socket => {
         roomId: data.roomId || null
       };
       
+      // Save AI response
       const aiMsg = new Message(responseData);
       await aiMsg.save();
       
-      // Send AI response to the appropriate room - FIXED for proper display
+      // Send AI response to the appropriate room
       if (data.roomId) {
-        // Private room - send to all including sender
         io.to(data.roomId).emit('ai response', responseData);
       } else {
-        // Public chat - send to all including sender
         io.emit('ai response', responseData);
       }
+      
+      console.log('✅ Echat AI Response sent successfully');
+      
     } catch (error) {
-      console.error('Error processing AI query:', error);
-      socket.emit('error', { message: 'Failed to process AI query' });
+      console.error('❌ Error processing AI query:', error);
+      
+      // Send a friendly error message
+      const errorResponse = {
+        id: data.id + '-ai-error',
+        name: '🤖 Echat AI',
+        message: "I'm Echat AI, but I'm having some technical difficulties right now. Please try again in a moment!",
+        timestamp: Date.now(),
+        roomId: data.roomId || null
+      };
+      
+      if (data.roomId) {
+        io.to(data.roomId).emit('ai response', errorResponse);
+      } else {
+        io.emit('ai response', errorResponse);
+      }
     }
-  });
+  }));
 
-  socket.on('chat image', async (data) => {
+  socket.on('chat image', requireAuth(async (data) => {
     try {
-      // Ensure replyTo structure is maintained
+      // Only allow public images if not in a private room
+      if (currentRoomId) {
+        socket.emit('error', { message: 'You are in a private room. Leave it to send public messages.' });
+        return;
+      }
+
       if (data.replyTo && !data.replyTo.id) {
         delete data.replyTo;
       }
       
       data.reactions = data.reactions || {};
       data.timestamp = data.timestamp || Date.now();
-      // Ensure roomId is null for public messages
-      data.roomId = null;
+      data.roomId = null; // Public message
       
       const isGif = data.type === 'gif' || 
                    data.mimeType === 'image/gif' || 
@@ -379,39 +455,41 @@ io.on('connection', socket => {
       const msg = new Message(data);
       await msg.save();
       
-      // Only emit to other users, not back to the sender
-      socket.broadcast.emit('chat image', data);
+      io.emit('chat image', data);
     } catch (error) {
       console.error('Error saving image message:', error);
       socket.emit('error', { message: 'Failed to save image message' });
     }
-  });
+  }));
 
-  socket.on('chat file', async (data) => {
+  socket.on('chat file', requireAuth(async (data) => {
     try {
-      // Ensure replyTo structure is maintained
+      // Only allow public files if not in a private room
+      if (currentRoomId) {
+        socket.emit('error', { message: 'You are in a private room. Leave it to send public messages.' });
+        return;
+      }
+
       if (data.replyTo && !data.replyTo.id) {
         delete data.replyTo;
       }
       
       data.reactions = data.reactions || {};
       data.timestamp = data.timestamp || Date.now();
-      // Ensure roomId is null for public messages
-      data.roomId = null;
+      data.roomId = null; // Public message
       
       const msg = new Message(data);
       await msg.save();
       
-      // Only emit to other users, not back to the sender
-      socket.broadcast.emit('chat file', data);
+      io.emit('chat file', data);
     } catch (error) {
       console.error('Error saving file message:', error);
       socket.emit('error', { message: 'Failed to save file message' });
     }
-  });
+  }));
 
-  // Private room events - FIXED for auto-expiration
-  socket.on('create private room', async (data) => {
+  // Private room events
+  socket.on('create private room', requireAuth(async (data) => {
     try {
       const roomId = generateRoomId();
       const room = new PrivateRoom({
@@ -421,19 +499,21 @@ io.on('connection', socket => {
         creator: userName,
         users: [socket.id],
         lastActivity: new Date(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
       });
       
       await room.save();
       privateRooms.set(roomId, room);
       
-      // Join the room
       socket.join(roomId);
+      currentRoomId = roomId;
       
-      // Set timeout to destroy room after 24 hours
+      const timeUntilExpiry = 24 * 60 * 60 * 1000;
       setTimeout(() => {
         expirePrivateRoom(roomId);
-      }, 24 * 60 * 60 * 1000);
+      }, timeUntilExpiry);
+      
+      console.log(`✅ Created private room ${roomId} - will expire in 24 hours`);
       
       socket.emit('private room created', room);
       io.emit('private rooms list', Array.from(privateRooms.values()));
@@ -441,14 +521,25 @@ io.on('connection', socket => {
       console.error('Error creating private room:', error);
       socket.emit('private room error', 'Failed to create private room');
     }
-  });
+  }));
 
-  socket.on('join private room', async (data) => {
+  socket.on('join private room', requireAuth(async (data) => {
     try {
-      const room = privateRooms.get(data.roomId);
+      let room = privateRooms.get(data.roomId);
       
       if (!room) {
-        socket.emit('private room error', 'Room not found');
+        room = await PrivateRoom.findOne({ 
+          id: data.roomId, 
+          expiresAt: { $gt: new Date() } 
+        });
+        
+        if (room) {
+          privateRooms.set(room.id, room);
+        }
+      }
+      
+      if (!room) {
+        socket.emit('private room error', 'Room not found or expired');
         return;
       }
       
@@ -457,11 +548,9 @@ io.on('connection', socket => {
         return;
       }
       
-      // Update last activity
       room.lastActivity = new Date();
       await PrivateRoom.updateOne({ id: room.id }, { lastActivity: room.lastActivity });
       
-      // Add user to room
       if (!room.users.includes(socket.id)) {
         room.users.push(socket.id);
         await PrivateRoom.updateOne({ id: room.id }, { 
@@ -470,69 +559,85 @@ io.on('connection', socket => {
         });
       }
       
-      // Join socket room
       socket.join(room.id);
+      currentRoomId = room.id;
       
-      // Send room messages
+      // Clear current messages and load private room messages
+      socket.emit('clear current chat');
       const roomMessages = await Message.find({ roomId: room.id }).sort({ timestamp: 1 });
       socket.emit('private messages', roomMessages);
       
       socket.emit('private room joined', room);
+      console.log(`✅ User ${userName} joined private room ${room.id}`);
     } catch (error) {
       console.error('Error joining private room:', error);
       socket.emit('private room error', 'Failed to join private room');
     }
-  });
+  }));
 
-  socket.on('leave private room', () => {
-    // Leave all rooms
-    const rooms = Array.from(privateRooms.values());
-    rooms.forEach(room => {
-      if (room.users.includes(socket.id)) {
-        const userIndex = room.users.indexOf(socket.id);
-        if (userIndex !== -1) {
-          room.users.splice(userIndex, 1);
-          // Update in database
-          PrivateRoom.updateOne({ id: room.id }, { users: room.users })
-            .catch(err => console.error('Error updating room users:', err));
-        }
-        socket.leave(room.id);
-      }
-    });
-    
-    socket.emit('private room left');
-    
-    // Send public messages
-    Message.find({ roomId: null })
-      .sort({ timestamp: 1 })
-      .then(messages => {
-        socket.emit('previous messages', messages);
-      })
-      .catch(err => console.error('Error fetching previous messages:', err));
-  });
-
-  socket.on('private message', async (data) => {
+  socket.on('leave private room', requireAuth(async () => {
     try {
-      const room = privateRooms.get(data.roomId);
+      if (currentRoomId) {
+        const room = privateRooms.get(currentRoomId);
+        if (room) {
+          const userIndex = room.users.indexOf(socket.id);
+          if (userIndex !== -1) {
+            room.users.splice(userIndex, 1);
+            
+            await PrivateRoom.updateOne({ id: room.id }, { 
+              users: room.users,
+              lastActivity: new Date()
+            });
+            
+            socket.leave(room.id);
+            console.log(`✅ User ${userName} left private room ${room.id}`);
+          }
+        }
+        
+        currentRoomId = null;
+      }
+      
+      socket.emit('private room left');
+      socket.emit('clear current chat');
+      
+      // Load fresh public messages after leaving room
+      Message.find({ roomId: null })
+        .sort({ timestamp: 1 })
+        .then(messages => {
+          socket.emit('previous messages', messages);
+        })
+        .catch(err => console.error('Error fetching previous messages:', err));
+    } catch (error) {
+      console.error('Error leaving private room:', error);
+    }
+  }));
+
+  socket.on('private message', requireAuth(async (data) => {
+    try {
+      if (!currentRoomId) {
+        socket.emit('private room error', 'You are not in a private room');
+        return;
+      }
+      
+      const room = privateRooms.get(currentRoomId);
       
       if (room && room.users.includes(socket.id)) {
-        // Update last activity
         room.lastActivity = new Date();
         await PrivateRoom.updateOne({ id: room.id }, { lastActivity: room.lastActivity });
         
-        // Ensure replyTo structure is maintained
         if (data.replyTo && !data.replyTo.id) {
           delete data.replyTo;
         }
         
         data.reactions = data.reactions || {};
         data.timestamp = data.timestamp || Date.now();
+        data.roomId = currentRoomId;
         
         const msg = new Message(data);
         await msg.save();
         
-        // Send to all users in the room except the sender
-        socket.to(room.id).emit('private message', data);
+        // Send ONLY to the private room
+        io.to(room.id).emit('private message', data);
       } else {
         socket.emit('private room error', 'You are not a member of this room');
       }
@@ -540,13 +645,13 @@ io.on('connection', socket => {
       console.error('Error saving private message:', error);
       socket.emit('error', { message: 'Failed to send private message' });
     }
-  });
+  }));
 
-  socket.on('get private rooms', () => {
+  socket.on('get private rooms', requireAuth(() => {
     socket.emit('private rooms list', Array.from(privateRooms.values()));
-  });
+  }));
 
-  socket.on('get private messages', async (roomId) => {
+  socket.on('get private messages', requireAuth(async (roomId) => {
     try {
       const room = privateRooms.get(roomId);
       
@@ -557,29 +662,40 @@ io.on('connection', socket => {
     } catch (error) {
       console.error('Error getting private messages:', error);
     }
-  });
+  }));
 
   let typingTimeout;
-  socket.on('typing', name => {
-    clearTimeout(typingTimeout);
-    socket.broadcast.emit('typing', name);
+  socket.on('typing', requireAuth((name) => {
+    if (currentRoomId) {
+      socket.to(currentRoomId).emit('typing', name);
+    } else {
+      socket.broadcast.emit('typing', name);
+    }
     
+    clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => {
-      socket.broadcast.emit('stop typing', name);
+      if (currentRoomId) {
+        socket.to(currentRoomId).emit('stop typing', name);
+      } else {
+        socket.broadcast.emit('stop typing', name);
+      }
     }, 3000);
-  });
+  }));
 
-  socket.on('voice-stream', data => {
+  socket.on('voice-stream', requireAuth((data) => {
     try {
-      socket.broadcast.emit('voice-stream', data);
+      if (currentRoomId) {
+        socket.to(currentRoomId).emit('voice-stream', data);
+      } else {
+        socket.broadcast.emit('voice-stream', data);
+      }
     } catch (error) {
       console.error('Voice stream error:', error);
     }
-  });
+  }));
 
-  socket.on('clear all chat', async () => {
+  socket.on('clear all chat', requireAuth(async () => {
     try {
-      // Only delete public messages (those with roomId = null)
       const publicMessagesWithFiles = await Message.find({ 
         fileId: { $exists: true },
         roomId: null
@@ -588,7 +704,6 @@ io.on('connection', socket => {
       for (const message of publicMessagesWithFiles) {
         if (message.fileId && bucket) {
           try {
-            // ensure id is an ObjectId
             const fid = (message.fileId instanceof mongoose.Types.ObjectId) ? message.fileId : new mongoose.Types.ObjectId(message.fileId);
             await bucket.delete(fid);
           } catch (error) {
@@ -597,18 +712,15 @@ io.on('connection', socket => {
         }
       }
       
-      // Only delete public messages
       await Message.deleteMany({ roomId: null });
-      
-      // Notify all clients to clear public chat
       io.emit('clear all chat');
     } catch (error) {
       console.error('Error clearing chat:', error);
       socket.emit('error', { message: 'Failed to clear chat' });
     }
-  });
+  }));
 
-  socket.on('delete message', async (id) => {
+  socket.on('delete message', requireAuth(async (id) => {
     try {
       const message = await Message.findOne({ id });
       
@@ -623,7 +735,6 @@ io.on('connection', socket => {
       
       await Message.deleteOne({ id });
       
-      // Emit to the appropriate room
       if (message && message.roomId) {
         io.to(message.roomId).emit('delete message', id);
       } else {
@@ -633,16 +744,15 @@ io.on('connection', socket => {
       console.error('Error deleting message:', error);
       socket.emit('error', { message: 'Failed to delete message' });
     }
-  });
+  }));
 
-  socket.on('react message', async ({ id, emoji, name }) => {
+  socket.on('react message', requireAuth(async ({ id, emoji, name }) => {
     try {
       const message = await Message.findOne({ id });
       if (!message) return;
       
       if (!message.reactions) message.reactions = {};
       
-      // Toggle reaction
       if (message.reactions[name] === emoji) {
         delete message.reactions[name];
       } else {
@@ -651,7 +761,6 @@ io.on('connection', socket => {
       
       await Message.updateOne({ id }, { $set: { reactions: message.reactions } });
       
-      // Emit to the appropriate room
       if (message.roomId) {
         io.to(message.roomId).emit('react message', { id, reactions: message.reactions });
       } else {
@@ -661,35 +770,31 @@ io.on('connection', socket => {
       console.error('Error updating reaction:', error);
       socket.emit('error', { message: 'Failed to update reaction' });
     }
-  });
+  }));
 
   socket.on('disconnect', () => {
-    if (userName) {
+    if (userName && isAuthenticated) {
       onlineUsers.delete(socket.id);
       io.emit('user left', userName);
       broadcastUsers();
     }
     
-    // Remove user from private rooms and check for expiration
-    privateRooms.forEach((room, roomId) => {
-      const userIndex = room.users.indexOf(socket.id);
-      if (userIndex !== -1) {
-        room.users.splice(userIndex, 1);
-        
-        // Update in database
-        PrivateRoom.updateOne({ id: roomId }, { users: room.users })
-          .catch(err => console.error('Error updating room users:', err));
-        
-        // If no users left, check if room should be expired
-        if (room.users.length === 0) {
-          const timeSinceLastActivity = new Date() - room.lastActivity;
-          // If room has been inactive for more than 1 hour, expire it
-          if (timeSinceLastActivity > 60 * 60 * 1000) {
-            expirePrivateRoom(roomId);
-          }
+    if (currentRoomId) {
+      const room = privateRooms.get(currentRoomId);
+      if (room) {
+        const userIndex = room.users.indexOf(socket.id);
+        if (userIndex !== -1) {
+          room.users.splice(userIndex, 1);
+          
+          PrivateRoom.updateOne({ id: room.id }, { 
+            users: room.users,
+            lastActivity: new Date()
+          }).catch(err => console.error('Error updating room users:', err));
+          
+          console.log(`✅ User ${userName} removed from room ${room.id} on disconnect`);
         }
       }
-    });
+    }
     
     if (typingTimeout) {
       clearTimeout(typingTimeout);
@@ -702,9 +807,16 @@ io.on('connection', socket => {
 });
 
 // Load private rooms on startup
-loadPrivateRooms();
+setTimeout(() => {
+  loadPrivateRooms();
+}, 1000);
 
-// Cleanup expired rooms periodically (every hour)
+// Test AI connection on startup
+setTimeout(() => {
+  testAIConnection();
+}, 2000);
+
+// Cleanup expired rooms periodically
 setInterval(async () => {
   try {
     const expiredRooms = await PrivateRoom.find({ expiresAt: { $lt: new Date() } });
@@ -712,19 +824,11 @@ setInterval(async () => {
       await expirePrivateRoom(room.id);
     }
     
-    // Also cleanup rooms that have been inactive for too long
-    const inactiveRooms = await PrivateRoom.find({ 
-      lastActivity: { $lt: new Date(Date.now() - 60 * 60 * 1000) }, // 1 hour
-      users: { $size: 0 } // No users
-    });
-    
-    for (const room of inactiveRooms) {
-      await expirePrivateRoom(room.id);
-    }
+    console.log(`🕒 Periodic cleanup: Checked ${expiredRooms.length} expired rooms`);
   } catch (error) {
     console.error('Error cleaning up expired rooms:', error);
   }
-}, 60 * 60 * 1000); // Run every hour
+}, 60 * 60 * 1000);
 
 app.use((error, req, res, next) => {
   console.error('Express error:', error);
@@ -740,4 +844,4 @@ process.on('SIGTERM', async () => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`✅ Enhanced Server with Gemini AI running at http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Enhanced Server with REAL Echat AI running at http://localhost:${PORT}`));
