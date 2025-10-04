@@ -1161,7 +1161,7 @@
   <!-- Chat Container (Hidden until login) -->
   <div id="chat-container">
     <header>
-      <span>💬 BlueChat</span>
+      <span>💬 Echat</span>
       <div>
         <span id="online-count">Online: 0</span>
         <button class="hamburger" id="hamburger-btn">☰</button>
@@ -1403,7 +1403,7 @@
       // Show welcome message
       const welcomeMsg = document.createElement('div');
       welcomeMsg.className = 'system';
-      welcomeMsg.textContent = `Welcome to BlueChat, ${userName}!`;
+      welcomeMsg.textContent = `Welcome to Echat, ${userName}!`;
       messages.appendChild(welcomeMsg);
     });
 
@@ -1595,7 +1595,7 @@
         // Use Web Share API if available
         if (navigator.share) {
           navigator.share({
-            title: 'Message from BlueChat',
+            title: 'Message from Echat',
             text: shareText,
             url: window.location.href
           }).then(() => {
@@ -2884,7 +2884,7 @@
       }
     }, 5000);
 
-    console.log('✅ BlueChat with Echat AI and Sky Blue theme loaded');
+    console.log('✅ Echat with Echat AI and Sky Blue theme loaded');
   </script>
 </body>
 </html>
