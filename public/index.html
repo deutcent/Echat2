@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
-  <title>BlueChat</title>
+  <title>Echat</title>
   <style>
     * {
       box-sizing: border-box;
@@ -380,6 +380,25 @@
       border-radius: 16px;
       border: 1px solid #e1f0ff;
       box-shadow: 0 1px 2px rgba(74, 144, 226, 0.1);
+    }
+
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #4A90E2;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+      z-index: 10000;
+      transform: translateX(150%);
+      transition: transform 0.3s ease;
+    }
+
+    .toast.show {
+      transform: translateX(0);
     }
 
     /* Reaction popup positioning */
@@ -1129,12 +1148,15 @@
 <body>
   <!-- Login Screen -->
   <div id="login-container">
-    <h2>💬 BlueChat Login</h2>
+    <h2>💬 Echat Login</h2>
     <input type="text" id="name-input" class="login-input" placeholder="Enter your name" required>
     <input type="password" id="password-input" class="login-input" placeholder="Enter password" required>
     <button id="login-btn" class="login-btn">Join Chat</button>
     <div id="login-error" style="color: #e53e3e; margin-top: 10px; display: none;"></div>
   </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast"></div>
 
   <!-- Chat Container (Hidden until login) -->
   <div id="chat-container">
@@ -1284,6 +1306,7 @@
     const replyToName = document.getElementById('reply-to-name');
     const replyContent = document.getElementById('reply-content');
     const cancelReplyBtn = document.getElementById('cancel-reply');
+    const toast = document.getElementById('toast');
     
     // Private rooms elements
     const hamburgerBtn = document.getElementById('hamburger-btn');
@@ -1322,6 +1345,16 @@
     richInput.setAttribute('data-supports-images', 'true');
     richInput.setAttribute('data-supports-gifs', 'true');
     richInput.setAttribute('enterkeyhint', 'send');
+
+    // Toast notification function
+    function showToast(message, duration = 3000) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, duration);
+    }
 
     // Login functionality
     loginBtn.addEventListener('click', () => {
@@ -1531,7 +1564,7 @@
       });
     }
     
-    // Create palette for message actions
+    // Create palette for message actions - FIXED SHARING BUTTON
     function createPalette(x, y, msgData, isSender) {
       // Remove any existing palettes
       document.querySelectorAll('.palette').forEach(p => p.remove());
@@ -1539,13 +1572,51 @@
       const palette = document.createElement('div');
       palette.className = 'palette';
       
-      // Add share button
+      // Add share button - FIXED
       const shareBtn = document.createElement('button');
       shareBtn.textContent = '📤';
       shareBtn.title = 'Share message';
       shareBtn.onclick = (e) => {
         e.stopPropagation();
-        // Share functionality would go here
+        
+        // Get message content for sharing
+        let shareContent = '';
+        if (msgData.message) {
+          shareContent = msgData.message;
+        } else if (msgData.type === 'image' || msgData.type === 'gif') {
+          shareContent = `Shared ${msgData.type}: ${msgData.url}`;
+        } else if (msgData.type === 'file') {
+          shareContent = `Shared file: ${msgData.filename}`;
+        }
+        
+        // Create share text
+        const shareText = `${msgData.name}: ${shareContent}`;
+        
+        // Use Web Share API if available
+        if (navigator.share) {
+          navigator.share({
+            title: 'Message from BlueChat',
+            text: shareText,
+            url: window.location.href
+          }).then(() => {
+            console.log('Message shared successfully');
+          }).catch(err => {
+            console.log('Error sharing:', err);
+            // Fallback to clipboard
+            navigator.clipboard.writeText(shareText).then(() => {
+              showToast('Message copied to clipboard!');
+            });
+          });
+        } else {
+          // Fallback to clipboard
+          navigator.clipboard.writeText(shareText).then(() => {
+            showToast('Message copied to clipboard!');
+          }).catch(err => {
+            console.error('Failed to copy: ', err);
+            showToast('Failed to share message');
+          });
+        }
+        
         palette.remove();
       };
       palette.appendChild(shareBtn);
@@ -1577,7 +1648,9 @@
           }
         }
         
-        navigator.clipboard.writeText(textToCopy);
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          showToast('Copied to clipboard!');
+        });
         palette.remove();
       };
       palette.appendChild(copyBtn);
@@ -2417,13 +2490,13 @@
 
     // Private room events
     socket.on('private room created', (room) => {
-      alert(`Private room created! Room ID: ${room.id}`);
+      showToast(`Private room created! Room ID: ${room.id}`);
       newRoomNameInput.value = '';
       newRoomPasswordInput.value = '';
     });
 
     socket.on('private room joined', (room) => {
-      alert(`Joined private room: ${room.name}`);
+      showToast(`Joined private room: ${room.name}`);
       joinRoomIdInput.value = '';
       joinRoomPasswordInput.value = '';
       updateCurrentRoomDisplay(room);
@@ -2431,7 +2504,7 @@
     });
 
     socket.on('private room error', (error) => {
-      alert(error);
+      showToast(error);
     });
 
     socket.on('private rooms list', (rooms) => {
@@ -2439,6 +2512,7 @@
     });
 
     socket.on('private room left', () => {
+      showToast('Left private room');
       updateCurrentRoomDisplay(null);
     });
 
@@ -2501,7 +2575,7 @@
 
     socket.on('error', (error) => {
       console.error('Socket error:', error);
-      alert(error.message || 'An error occurred. Please try again.');
+      showToast(error.message || 'An error occurred. Please try again.');
     });
 
     // Attach click handler to cancel reply button
@@ -2518,7 +2592,7 @@
       const password = newRoomPasswordInput.value.trim();
       
       if (!roomName || !password) {
-        alert('Please enter both room name and password');
+        showToast('Please enter both room name and password');
         return;
       }
       
@@ -2530,7 +2604,7 @@
       const password = joinRoomPasswordInput.value.trim();
       
       if (!roomId || !password) {
-        alert('Please enter both room ID and password');
+        showToast('Please enter both room ID and password');
         return;
       }
       
@@ -2553,6 +2627,7 @@
       lastDisplayedDate = null;
       replyingToMessage = null;
       replyPreview.style.display = 'none';
+      showToast('Chat cleared for all users');
     });
 
     // Voice streaming functionality
@@ -2600,9 +2675,10 @@
         };
         
         voiceBtn.classList.add('speaking');
+        showToast('Voice recording started');
       } catch (error) {
         console.error('Microphone access error:', error);
-        alert("Microphone access denied or not available");
+        showToast("Microphone access denied or not available");
         isStreaming = false;
       }
     }
@@ -2619,6 +2695,7 @@
       
       processor = source = mediaStream = audioContext = null;
       voiceBtn.classList.remove('speaking');
+      showToast('Voice recording stopped');
     }
 
     voiceBtn.addEventListener('mousedown', requireAuth(startStreaming));
@@ -2661,10 +2738,12 @@
     socket.on('disconnect', () => {
       console.log('Disconnected from server');
       userList.textContent = 'Disconnected. Reconnecting...';
+      showToast('Disconnected from server');
     });
 
     socket.on('reconnect', () => {
       console.log('Reconnected to server');
+      showToast('Reconnected to server');
       if (isAuthenticated) {
         socket.emit('authenticate', { name: userName, password: 'oracle' });
       }

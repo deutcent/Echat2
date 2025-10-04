@@ -10,11 +10,11 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Initialize Gemini AI with proper error handling
+// Initialize Gemini AI with NEW API KEY
 let genAI;
 try {
-  genAI = new GoogleGenerativeAI("AIzaSyDVF2JHZcNQEWLCmjEPrXI5n2WRcnTpEQU");
-  console.log('✅ Gemini AI initialized successfully');
+  genAI = new GoogleGenerativeAI("AIzaSyCiyOFUe-rjwWWxieSYgFevMOI2urRCFSY");
+  console.log('✅ Gemini AI initialized successfully with new API key');
 } catch (error) {
   console.error('❌ Failed to initialize Gemini AI:', error);
   // Create a dummy genAI object to prevent crashes
